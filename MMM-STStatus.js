@@ -87,12 +87,12 @@ Module.register("MMM-STStatus", {
   /**
    * Load CSS styles
    */
-  getStyles: function() {
-    return [
-      this.file("node_modules/@fortawesome/fontawesome-free/css/all.min.css"),
-      this.file("MMM-STStatus.css")
-    ];
-  },
+getStyles: function () {
+  return [
+    this.file("node_modules/@fortawesome/fontawesome-free/css/all.min.css"),
+    this.file("css/MMM-STStatus.css")
+  ];
+},
 
   /**
    * Handle socket notifications from node_helper
