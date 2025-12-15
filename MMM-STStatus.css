@@ -1,0 +1,304 @@
+/* MMM-STStatus.css
+ * Styling for SmartThings device status display
+ * Designed to match MMM-Ecobee aesthetic
+ */
+
+/* Main container */
+.mmm-ststatus {
+  font-family: "Roboto Condensed", Arial, sans-serif;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Loading state */
+.mmm-ststatus .loading {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.mmm-ststatus .loading .fa-spinner {
+  margin-right: 8px;
+}
+
+/* Error message */
+.mmm-ststatus .error-message {
+  padding: 10px 15px;
+  margin-bottom: 10px;
+  background: rgba(255, 100, 100, 0.2);
+  border-radius: 5px;
+  color: #ff6b6b;
+  font-size: 12px;
+}
+
+.mmm-ststatus .error-message .fa-exclamation-triangle {
+  margin-right: 8px;
+}
+
+/* No devices message */
+.mmm-ststatus .no-devices {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
+/* Device table */
+.mmm-ststatus .device-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+}
+
+.mmm-ststatus .device-row {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 5px;
+}
+
+.mmm-ststatus .device-row td {
+  padding: 8px 10px;
+  vertical-align: middle;
+}
+
+.mmm-ststatus .device-row td:first-child {
+  border-radius: 5px 0 0 5px;
+}
+
+.mmm-ststatus .device-row td:last-child {
+  border-radius: 0 5px 5px 0;
+}
+
+/* Icon column */
+.mmm-ststatus .device-icon {
+  width: 30px;
+  text-align: center;
+  font-size: 16px;
+}
+
+/* Device name */
+.mmm-ststatus .device-name {
+  font-size: 14px;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px;
+}
+
+/* Status value */
+.mmm-ststatus .device-status {
+  text-align: right;
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.mmm-ststatus .status-value {
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+/* Secondary attributes */
+.mmm-ststatus .device-secondary {
+  text-align: right;
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.mmm-ststatus .secondary-item {
+  margin-left: 10px;
+}
+
+.mmm-ststatus .secondary-item .fas {
+  margin-right: 3px;
+  font-size: 10px;
+}
+
+/* Last updated footer */
+.mmm-ststatus .last-updated {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 10px;
+  color: #666;
+  text-align: right;
+}
+
+/* ================================================
+   STATE COLOR CLASSES
+   ================================================ */
+
+/* ON state - Green */
+.mmm-ststatus .state-on {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-status .state-on {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+/* OFF state - Grey */
+.mmm-ststatus .state-off {
+  color: #888;
+}
+
+.mmm-ststatus .device-status .state-off {
+  background: rgba(136, 136, 136, 0.2);
+}
+
+/* OPEN state - Red (alert) */
+.mmm-ststatus .state-open {
+  color: #f87171;
+}
+
+.mmm-ststatus .device-status .state-open {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+/* CLOSED state - Green */
+.mmm-ststatus .state-closed {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-status .state-closed {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+/* LOCKED state - Green */
+.mmm-ststatus .state-locked {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-status .state-locked {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+/* UNLOCKED state - Red (alert) */
+.mmm-ststatus .state-unlocked {
+  color: #f87171;
+}
+
+.mmm-ststatus .device-status .state-unlocked {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+/* MOTION state - Blue */
+.mmm-ststatus .state-motion {
+  color: #60a5fa;
+}
+
+.mmm-ststatus .device-status .state-motion {
+  background: rgba(96, 165, 250, 0.2);
+}
+
+/* No motion - Grey */
+.mmm-ststatus .state-inactive {
+  color: #666;
+}
+
+.mmm-ststatus .device-status .state-inactive {
+  background: rgba(102, 102, 102, 0.2);
+}
+
+/* HOME (presence) - Green */
+.mmm-ststatus .state-home {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-status .state-home {
+  background: rgba(74, 222, 128, 0.2);
+}
+
+/* AWAY (presence) - Grey */
+.mmm-ststatus .state-away {
+  color: #888;
+}
+
+.mmm-ststatus .device-status .state-away {
+  background: rgba(136, 136, 136, 0.2);
+}
+
+/* PARTIALLY state (for blinds) - Yellow/Amber */
+.mmm-ststatus .state-partially {
+  color: #fbbf24;
+}
+
+.mmm-ststatus .device-status .state-partially {
+  background: rgba(251, 191, 36, 0.2);
+}
+
+/* Low battery warning */
+.mmm-ststatus .state-battery-low {
+  color: #fbbf24;
+}
+
+/* ================================================
+   ICON COLORS (match state)
+   ================================================ */
+
+.mmm-ststatus .device-icon .state-on {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-icon .state-off {
+  color: #666;
+}
+
+.mmm-ststatus .device-icon .state-open {
+  color: #f87171;
+}
+
+.mmm-ststatus .device-icon .state-closed {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-icon .state-locked {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-icon .state-unlocked {
+  color: #f87171;
+}
+
+.mmm-ststatus .device-icon .state-motion {
+  color: #60a5fa;
+}
+
+.mmm-ststatus .device-icon .state-inactive {
+  color: #666;
+}
+
+.mmm-ststatus .device-icon .state-home {
+  color: #4ade80;
+}
+
+.mmm-ststatus .device-icon .state-away {
+  color: #666;
+}
+
+.mmm-ststatus .device-icon .state-partially {
+  color: #fbbf24;
+}
+
+/* ================================================
+   RESPONSIVE ADJUSTMENTS
+   ================================================ */
+
+/* For narrower displays */
+@media (max-width: 400px) {
+  .mmm-ststatus .device-name {
+    max-width: 100px;
+    font-size: 12px;
+  }
+  
+  .mmm-ststatus .device-status {
+    font-size: 11px;
+  }
+  
+  .mmm-ststatus .device-secondary {
+    display: none;
+  }
+}

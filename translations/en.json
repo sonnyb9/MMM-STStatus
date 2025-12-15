@@ -1,0 +1,18 @@
+{
+  "LOADING": "Loading devices...",
+  "NO_DEVICES": "No devices found",
+  "AUTH_ERROR": "SmartThings authentication failed. Check your Personal Access Token.",
+  "CONNECTION_ERROR": "Unable to reach SmartThings. Showing cached data.",
+  "UPDATED": "Updated",
+  
+  "STATE_ON": "ON",
+  "STATE_OFF": "OFF",
+  "STATE_OPEN": "OPEN",
+  "STATE_CLOSED": "CLOSED",
+  "STATE_LOCKED": "LOCKED",
+  "STATE_UNLOCKED": "UNLOCKED",
+  "STATE_MOTION": "MOTION",
+  "STATE_NO_MOTION": "—",
+  "STATE_HOME": "HOME",
+  "STATE_AWAY": "AWAY"
+}
