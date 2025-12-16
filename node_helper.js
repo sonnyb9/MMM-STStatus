@@ -448,6 +448,45 @@ module.exports = NodeHelper.create({
       }
     }
 
+// --- Temperature extraction across ALL components ---
+if (status && status.components) {
+  for (const componentName in status.components) {
+    const component = status.components[componentName];
+
+    // temperatureMeasurement capability
+    if (component.temperatureMeasurement &&
+        component.temperatureMeasurement.temperature &&
+        component.temperatureMeasurement.temperature.value !== undefined) {
+
+      normalized.temperature =
+        component.temperatureMeasurement.temperature.value;
+
+      if (this.config.debug) {
+        this.log(
+          "Temperature from component '" + componentName +
+          "': " + normalized.temperature
+        );
+      }
+      break;
+    }
+
+    // Some devices expose temperature under 'temperature'
+    if (component.temperature &&
+        component.temperature.value !== undefined) {
+
+      normalized.temperature = component.temperature.value;
+
+      if (this.config.debug) {
+        this.log(
+          "Temperature (alt) from component '" + componentName +
+          "': " + normalized.temperature
+        );
+      }
+      break;
+    }
+  }
+}
+
     return normalized;
   },
 
@@ -567,35 +606,45 @@ module.exports = NodeHelper.create({
   /**
    * Mock data for test mode
    */
-  sendMockData: function() {
-    const mockDevices = [
-      { id: "1", name: "Living Room Lamp", room: "Living Room", primaryCapability: "switch", primaryState: "on" },
-      { id: "2", name: "Front Door", room: "Entry", primaryCapability: "contact", primaryState: "closed" },
-      { id: "3", name: "Back Door", room: "Kitchen", primaryCapability: "contact", primaryState: "open" },
-      { id: "4", name: "Hallway Motion", room: "Hallway", primaryCapability: "motion", primaryState: "inactive" },
-      { id: "5", name: "Living Room Motion", room: "Living Room", primaryCapability: "motion", primaryState: "active" },
-      { id: "6", name: "Front Door Lock", room: "Entry", primaryCapability: "lock", primaryState: "locked" },
-      { id: "7", name: "Back Door Lock", room: "Kitchen", primaryCapability: "lock", primaryState: "unlocked" },
-      { id: "8", name: "Thermostat", room: "Living Room", primaryCapability: "temperature", primaryState: 72, battery: 85 },
-      { id: "9", name: "Bedroom Sensor", room: "Bedroom", primaryCapability: "temperature", primaryState: 68, humidity: 45, battery: 15 },
-      { id: "10", name: "Garage Door", room: "Garage", primaryCapability: "contact", primaryState: "closed", battery: 50 }
-    ];
+sendMockData: function() {
+  const mockDevices = [
+    { id: "1", name: "Living Room Lamp", room: "Living Room", primaryCapability: "switch", primaryState: "on" },
+    { id: "2", name: "Front Door", room: "Entry", primaryCapability: "contact", primaryState: "closed" },
+    { id: "3", name: "Back Door", room: "Kitchen", primaryCapability: "contact", primaryState: "open" },
+    { id: "4", name: "Hallway Motion", room: "Hallway", primaryCapability: "motion", primaryState: "inactive" },
+    { id: "5", name: "Living Room Motion", room: "Living Room", primaryCapability: "motion", primaryState: "active" },
+    { id: "6", name: "Front Door Lock", room: "Entry", primaryCapability: "lock", primaryState: "locked" },
+    { id: "7", name: "Back Door Lock", room: "Kitchen", primaryCapability: "lock", primaryState: "unlocked" },
+    { id: "8", name: "Thermostat", room: "Living Room", primaryCapability: "temperature", primaryState: 72, battery: 85 },
+    { id: "9", name: "Bedroom Sensor", room: "Bedroom", primaryCapability: "temperature", primaryState: 68, humidity: 45, battery: 15 },
+    { id: "10", name: "Garage Door", room: "Garage", primaryCapability: "contact", primaryState: "closed", battery: 50 }
+  ];
+
+  // Clear any existing poller
+  if (this.pollTimer) {
+    clearInterval(this.pollTimer);
+    this.pollTimer = null;
+  }
+
+  // Send initial mock data immediately
+  this.sendSocketNotification("DEVICE_DATA", {
+    devices: mockDevices,
+    timestamp: new Date().toISOString()
+  });
+
+  // Reuse pollTimer for mock polling
+  const interval = this.config.pollInterval || 60000;
+  this.pollTimer = setInterval(() => {
+    // Toggle one device to simulate activity
+    mockDevices[4].primaryState =
+      mockDevices[4].primaryState === "active" ? "inactive" : "active";
 
     this.sendSocketNotification("DEVICE_DATA", {
       devices: mockDevices,
       timestamp: new Date().toISOString()
     });
-
-    // Set up mock polling
-    setInterval(() => {
-      // Randomly toggle some states for testing
-      mockDevices[4].primaryState = mockDevices[4].primaryState === "active" ? "inactive" : "active";
-      this.sendSocketNotification("DEVICE_DATA", {
-        devices: mockDevices,
-        timestamp: new Date().toISOString()
-      });
-    }, this.config.pollInterval || 60000);
-  },
+  }, interval);
+},
 
   /**
    * Utility functions
