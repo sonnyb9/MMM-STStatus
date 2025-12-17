@@ -302,3 +302,43 @@
     display: none;
   }
 }
+
+/* =========================================================
+ * Thermostat operating state colors (capability-based)
+ * ========================================================= */
+
+/* Heating */
+.thermostat-heating {
+  color: #ff4d4d; /* red */
+}
+
+/* Cooling */
+.thermostat-cooling {
+  color: #4da6ff; /* blue */
+}
+
+/* Fan only */
+.thermostat-fan-only {
+  color: #4dff88; /* green */
+}
+
+/* Idle / default */
+.thermostat-idle {
+  color: #ffffff; /* white */
+}
+
+/* =========================================================
+ * Low battery alert (flashing icon)
+ * ========================================================= */
+
+@keyframes battery-flash {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+/* Flash only when battery is low */
+.state-low.fa-battery-quarter {
+  animation: battery-flash 1.5s infinite;
+  color: #ff4d4d; /* optional: reinforce warning */
+}

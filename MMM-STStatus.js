@@ -22,6 +22,17 @@ Module.register("MMM-STStatus", {
     testMode: false               // Use mock data instead of live API
   },
 
+  // Thermostat capability rules
+  CAPABILITY_RULES: {
+    thermostatOperatingState: {
+      heating: "thermostat-heating",
+      cooling: "thermostat-cooling",
+      "fan only": "thermostat-fan-only",
+      fan: "thermostat-fan-only",
+      idle: "thermostat-idle"
+    }
+  },
+
   // Capability to icon mapping
   CAPABILITY_ICONS: {
     switch: { on: "fa-lightbulb", off: "fa-lightbulb" },
@@ -31,7 +42,7 @@ Module.register("MMM-STStatus", {
     presence: { present: "fa-house-user", notPresent: "fa-house" },
     temperature: "fa-thermometer-half",
     humidity: "fa-droplet",
-    blinds: { open: "fa-blinds-open", closed: "fa-blinds", partially: "fa-blinds" },
+    blinds: { open: "fa-window-maximize", closed: "fa-window-maximize", partially: "fa-window-maximize" },
     level: "fa-sliders",
     battery: {
       high: "fa-battery-full",
@@ -64,9 +75,9 @@ Module.register("MMM-STStatus", {
   /**
    * Called when module starts
    */
-  start: function() {
+  start: function () {
     Log.info("[MMM-STStatus] Starting module...");
-    
+
     // Validate configuration
     if (!this.config.token && !this.config.testMode) {
       this.error = "No SmartThings token configured.";
@@ -87,17 +98,17 @@ Module.register("MMM-STStatus", {
   /**
    * Load CSS styles
    */
-getStyles: function () {
-  return [
-    this.file("node_modules/@fortawesome/fontawesome-free/css/all.min.css"),
-    this.file("css/MMM-STStatus.css")
-  ];
-},
+  getStyles: function () {
+    return [
+      this.file("node_modules/@fortawesome/fontawesome-free/css/all.min.css"),
+      this.file("css/MMM-STStatus.css")
+    ];
+  },
 
   /**
    * Handle socket notifications from node_helper
    */
-  socketNotificationReceived: function(notification, payload) {
+  socketNotificationReceived: function (notification, payload) {
     if (this.config.debug) {
       Log.info("[MMM-STStatus] Received: " + notification);
     }
@@ -133,7 +144,7 @@ getStyles: function () {
   /**
    * Generate the DOM for this module
    */
-  getDom: function() {
+  getDom: function () {
     const wrapper = document.createElement("div");
     wrapper.className = "mmm-ststatus";
 
@@ -172,14 +183,14 @@ getStyles: function () {
   /**
    * Generate loading HTML
    */
-  getLoadingHtml: function() {
+  getLoadingHtml: function () {
     return '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading devices...</div>';
   },
 
   /**
    * Generate device table
    */
-  getDeviceTable: function() {
+  getDeviceTable: function () {
     const table = document.createElement("table");
     table.className = "device-table";
 
@@ -198,7 +209,7 @@ getStyles: function () {
   /**
    * Create a row for a device
    */
-  createDeviceRow: function(device) {
+  createDeviceRow: function (device) {
     const row = document.createElement("tr");
     row.className = "device-row";
 
@@ -232,7 +243,7 @@ getStyles: function () {
   /**
    * Get the icon for a device based on its capability and state
    */
-  getDeviceIcon: function(device) {
+  getDeviceIcon: function (device) {
     const capability = device.primaryCapability;
     const state = device.primaryState;
     let iconClass = "fa-question";
@@ -240,7 +251,7 @@ getStyles: function () {
 
     if (capability && this.CAPABILITY_ICONS[capability]) {
       const iconDef = this.CAPABILITY_ICONS[capability];
-      
+
       if (typeof iconDef === "string") {
         iconClass = iconDef;
       } else if (typeof iconDef === "object") {
@@ -249,7 +260,7 @@ getStyles: function () {
           if (state > 60) iconClass = iconDef.high;
           else if (state >= 20) iconClass = iconDef.medium;
           else iconClass = iconDef.low;
-        // Handle blinds based on level
+          // Handle blinds based on level
         } else if (capability === "blinds" && device.level !== undefined) {
           if (device.level === 0) {
             iconClass = iconDef.closed;
@@ -279,11 +290,13 @@ getStyles: function () {
   /**
    * Get primary status display for a device
    */
-  getPrimaryStatus: function(device) {
+  getPrimaryStatus: function (device) {
     const capability = device.primaryCapability;
     const state = device.primaryState;
-    let displayValue = state || "—";
+
+    let displayValue = "—";
     let stateClass = "";
+    let valueClass = "";
 
     // Normalize display values
     switch (capability) {
@@ -291,61 +304,96 @@ getStyles: function () {
         displayValue = state === "on" ? "ON" : "OFF";
         stateClass = state === "on" ? "state-on" : "state-off";
         break;
-      case "contact":
-        displayValue = state === "open" ? "OPEN" : "CLOSED";
-        stateClass = state === "open" ? "state-open" : "state-closed";
-        break;
-      case "motion":
-        displayValue = state === "active" ? "MOTION" : "—";
-        stateClass = state === "active" ? "state-motion" : "state-inactive";
-        break;
+
       case "lock":
         displayValue = state === "locked" ? "LOCKED" : "UNLOCKED";
         stateClass = state === "locked" ? "state-locked" : "state-unlocked";
         break;
+
+      case "contact":
+        displayValue = state === "open" ? "OPEN" : "CLOSED";
+        stateClass = state === "open" ? "state-open" : "state-closed";
+        break;
+
+      case "motion":
+        displayValue = state === "active" ? "MOTION" : "—";
+        stateClass = state === "active" ? "state-motion" : "state-inactive";
+        break;
+
       case "presence":
         displayValue = state === "present" ? "HOME" : "AWAY";
         stateClass = state === "present" ? "state-home" : "state-away";
         break;
-      case "temperature":
-        displayValue = this.formatTemperature(state);
+
+      case "temperature": {
+        const temp =
+          typeof state === "number"
+            ? state
+            : typeof device.temperature === "number"
+              ? device.temperature
+              : undefined;
+
+        displayValue =
+          typeof temp === "number"
+            ? this.formatTemperature(temp)
+            : "—";
         break;
-      case "humidity":
-        displayValue = state + "%";
-        break;
-      case "battery":
-        displayValue = state + "%";
-        if (state < 20) stateClass = "state-battery-low";
-        break;
-      case "level":
-        displayValue = state + "%";
-        break;
-      case "blinds":
-        // For blinds, show the level percentage if available
-        if (device.level !== undefined && device.level !== null) {
-          displayValue = device.level + "%";
-          if (device.level === 0) stateClass = "state-closed";
-          else if (device.level === 100) stateClass = "state-open";
-          else stateClass = "state-partially";
-        } else if (state === "open") {
-          displayValue = "OPEN";
-          stateClass = "state-open";
-        } else if (state === "closed") {
-          displayValue = "CLOSED";
-          stateClass = "state-closed";
+      }
+
+      case "blinds": {
+        // Use level from device if primaryState is not a number
+        const level = typeof state === "number" ? state : device.level;
+        
+        if (typeof level === "number") {
+          displayValue = level + "%";
+          // Determine state class based on level
+          if (level === 0) {
+            stateClass = "state-closed";
+          } else if (level === 100) {
+            stateClass = "state-open";
+          } else {
+            stateClass = "state-partially";
+          }
         } else {
-          displayValue = state || "—";
+          displayValue = "—";
         }
         break;
+      }
+
+      default:
+          if (state && typeof state === "object" && "value" in state) {
+            displayValue = state.value.toString();
+          } else if (state !== undefined && state !== null) {
+            displayValue = state.toString();
+          }
+          break;
     }
 
-    return '<span class="status-value ' + stateClass + '">' + displayValue + '</span>';
+    // Apply capability-based styling rules (e.g. thermostat operating state)
+    if (device.capabilities) {
+      for (const cap in this.CAPABILITY_RULES) {
+        const capValue = device.capabilities[cap];
+        const ruleSet = this.CAPABILITY_RULES[cap];
+
+        if (capValue && ruleSet[capValue]) {
+          valueClass += " " + ruleSet[capValue];
+        }
+      }
+    }
+
+    return (
+      '<span class="status-value ' +
+      stateClass + ' ' + valueClass +
+      '">' +
+      displayValue +
+      '</span>'
+    );
   },
 
   /**
    * Get secondary status attributes (battery, temperature, etc.)
    */
-  getSecondaryStatus: function(device) {
+  getSecondaryStatus: function (device) {
     const parts = [];
 
     // Add battery if present and not primary
@@ -364,15 +412,20 @@ getStyles: function () {
       parts.push('<span class="secondary-item"><i class="fas fa-droplet"></i> ' + device.humidity + '%</span>');
     }
 
+    // Add dimmer level for switch devices that have a level (not blinds)
+    if (device.level !== undefined && device.primaryCapability === "switch") {
+      parts.push('<span class="secondary-item"><i class="fas fa-sliders"></i> ' + device.level + '%</span>');
+    }
+
     return parts.join(" ");
   },
 
   /**
    * Format temperature based on config
    */
-  formatTemperature: function(value) {
+  formatTemperature: function (value) {
     if (value === undefined || value === null) return "—";
-    
+
     const unit = this.config.temperatureUnit.toUpperCase();
     if (unit === "C") {
       // Assume SmartThings returns Fahrenheit, convert to Celsius
@@ -385,9 +438,9 @@ getStyles: function () {
   /**
    * Sort devices based on config
    */
-  sortDevices: function(devices) {
+  sortDevices: function (devices) {
     const sortBy = this.config.defaultSort;
-    
+
     return devices.slice().sort((a, b) => {
       switch (sortBy) {
         case "room":
@@ -404,7 +457,7 @@ getStyles: function () {
   /**
    * Format timestamp for display
    */
-  formatTime: function(isoString) {
+  formatTime: function (isoString) {
     const date = new Date(isoString);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
