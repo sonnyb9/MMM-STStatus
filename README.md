@@ -189,17 +189,18 @@ Configure with:
 
 ## Supported Device Types
 
-| Capability | Display | Icon |
-|------------|---------|------|
-| Switch | ON / OFF | 💡 Lightbulb |
-| Contact Sensor | OPEN / CLOSED | 🚪 Door |
-| Motion Sensor | MOTION / — | 🚶 Person |
-| Lock | LOCKED / UNLOCKED | 🔒 Lock |
-| Presence Sensor | HOME / AWAY | 🏠 House |
-| Temperature | ##°F/°C | 🌡️ Thermometer |
-| Humidity | ##% | 💧 Droplet |
-| Battery | ##% | 🔋 Battery |
-| Window Shade/Blinds | ##% | 🪟 Window |
+| Capability | Display | Icon (Font Awesome) |
+|------------|---------|---------------------|
+| Switch | ON / OFF | `fa-lightbulb` |
+| Contact Sensor | OPEN / CLOSED | `fa-door-open` / `fa-door-closed` |
+| Motion Sensor | MOTION / — | `fa-person-walking` / `fa-person` |
+| Lock | LOCKED / UNLOCKED | `fa-lock` / `fa-lock-open` |
+| Presence Sensor | HOME / AWAY | `fa-house-user` / `fa-house` |
+| Temperature | ##°F/°C | `fa-thermometer-half` |
+| Humidity | ##% | `fa-droplet` |
+| Battery | ##% | `fa-battery-full` / `fa-battery-half` / `fa-battery-quarter` |
+| Window Shade/Blinds | ##% | `fa-window-maximize` |
+| Dimmer | ##% | `fa-sliders` |
 
 ### Thermostat Features
 
