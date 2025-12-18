@@ -4,6 +4,9 @@ node_modules/
 # Cache files
 .cache.json
 
+# OAuth tokens (user-specific, do not commit)
+oauth-tokens.enc
+
 # OS files
 .DS_Store
 Thumbs.db
