@@ -316,7 +316,7 @@ MMM-STStatus/
 
 - **MagicMirror²** - [https://magicmirror.builders/](https://magicmirror.builders/)
 - **MMM-Smartthings** by buzzkc - Inspiration and prior art ([GitHub](https://github.com/buzzkc/MMM-Smartthings))
-- **MMM-Ecobee** - UI design inspiration
+- **MMM-Ecobee** by parnic - UI design inspiration ([GitHub](https://github.com/parnic/MMM-Ecobee))
 - **SmartThings Community** - OAuth implementation guidance
 
 ## License
