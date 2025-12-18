@@ -5,9 +5,70 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+---
 
-## [1.0.0] - 2025-12-12
+## [0.2.0] – 2025-12-17
+
+### Added
+- Thermostat **heating and cooling setpoint display** as secondary status indicators.
+  - Displays both setpoints when available (e.g., auto mode).
+  - Displays a single setpoint when only heating or cooling is supported.
+- Capability-based **thermostat operating state styling** (vendor-agnostic).
+  - Supports heating, cooling, fan-only, and idle states.
+- Improved SmartThings capability parsing to support multiple thermostat schemas.
+- Window-style icon for blinds using Font Awesome Free.
+
+### Fixed
+- Primary status rendering bug that caused `[object Object]` to display for many devices.
+- Blinds now correctly display **percentage open** instead of action labels.
+- SmartThings thermostat operating state detection across differing API structures.
+- Authentication handling to prevent repeated polling after HTTP 401/403 errors.
+- Polling lifecycle issues that caused unnecessary API calls and performance degradation.
+- SSH responsiveness degradation caused by runaway polling and repeated authentication failures.
+
+### Changed
+- Refactored primary status handling to consistently return normalized display values.
+- Improved separation between primary state, secondary attributes, and styling rules.
+- Updated blinds icon mapping for better visual clarity.
+
+### Internal
+- Hardened node helper logic to stop polling after authentication failure.
+- Improved normalization of SmartThings device capabilities for extensibility.
+- Frontend logic structured to support future device types (e.g., additional thermostats).
+
+---
+
+## Known Issues
+
+### SmartThings Authentication (PAT)
+- The module currently relies on **SmartThings Personal Access Tokens (PATs)**.
+- PATs expire after **24 hours**, which can cause:
+  - Repeated HTTP 401/403 errors
+  - Polling loops and excessive API requests
+  - Degraded MagicMirror performance and SSH responsiveness
+
+### OAuth Migration (Planned)
+- Migration to **SmartThings OAuth authentication** is planned to address:
+  - Token expiration handling
+  - Automatic token refresh
+  - Improved long-term reliability
+- OAuth is not yet implemented.
+
+### Device Coverage
+- Thermostat support has been validated primarily against **Ecobee** devices.
+- Other thermostat vendors (e.g., Nest) are not yet tested and may require:
+  - Additional capability normalization rules
+  - Vendor-specific fallbacks
+
+### UI / UX
+- Battery percentage text is displayed, but:
+  - Thresholds are currently hardcoded
+  - No user-configurable warning levels yet
+- Low-battery visual alerts are present but not configurable.
+
+---
+
+## [0.1.0] – 2025-12-12
 
 ### Added
 - Initial release

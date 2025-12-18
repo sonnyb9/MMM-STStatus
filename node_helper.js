@@ -585,13 +585,27 @@ module.exports = NodeHelper.create({
       }
 
       // Thermostat operating state (vendor-agnostic)
-      if (
-        main.thermostatOperatingState &&
-        main.thermostatOperatingState.operatingState &&
-        main.thermostatOperatingState.operatingState.value
-      ) {
-        normalized.capabilities.thermostatOperatingState =
-          main.thermostatOperatingState.operatingState.value;
+      if (main.thermostatOperatingState) {
+        // Try operatingState first (standard)
+        if (
+          main.thermostatOperatingState.thermostatOperatingState &&
+          main.thermostatOperatingState.thermostatOperatingState.value
+        ) {
+          normalized.capabilities.thermostatOperatingState =
+            main.thermostatOperatingState.thermostatOperatingState.value;
+        }
+        // Fallback to operatingState
+        else if (
+          main.thermostatOperatingState.operatingState &&
+          main.thermostatOperatingState.operatingState.value
+        ) {
+          normalized.capabilities.thermostatOperatingState =
+            main.thermostatOperatingState.operatingState.value;
+        }
+        
+        if (this.config.debug && normalized.capabilities.thermostatOperatingState) {
+          this.log("Thermostat operating state: " + normalized.capabilities.thermostatOperatingState);
+        }
       }
 
       // Thermostat mode (heat / cool / auto / off)
@@ -602,6 +616,44 @@ module.exports = NodeHelper.create({
       ) {
         normalized.capabilities.thermostatMode =
           main.thermostatMode.thermostatMode.value;
+      }
+
+      // Thermostat heating setpoint
+      if (main.thermostatHeatingSetpoint) {
+        if (this.config.debug) {
+          this.log("thermostatHeatingSetpoint object: " + JSON.stringify(main.thermostatHeatingSetpoint));
+        }
+        if (
+          main.thermostatHeatingSetpoint.heatingSetpoint &&
+          main.thermostatHeatingSetpoint.heatingSetpoint.value !== undefined
+        ) {
+          normalized.heatingSetpoint =
+            main.thermostatHeatingSetpoint.heatingSetpoint.value;
+          normalized.capabilities.heatingSetpoint =
+            main.thermostatHeatingSetpoint.heatingSetpoint.value;
+          if (this.config.debug) {
+            this.log("Heating setpoint: " + normalized.heatingSetpoint);
+          }
+        }
+      }
+
+      // Thermostat cooling setpoint
+      if (main.thermostatCoolingSetpoint) {
+        if (this.config.debug) {
+          this.log("thermostatCoolingSetpoint object: " + JSON.stringify(main.thermostatCoolingSetpoint));
+        }
+        if (
+          main.thermostatCoolingSetpoint.coolingSetpoint &&
+          main.thermostatCoolingSetpoint.coolingSetpoint.value !== undefined
+        ) {
+          normalized.coolingSetpoint =
+            main.thermostatCoolingSetpoint.coolingSetpoint.value;
+          normalized.capabilities.coolingSetpoint =
+            main.thermostatCoolingSetpoint.coolingSetpoint.value;
+          if (this.config.debug) {
+            this.log("Cooling setpoint: " + normalized.coolingSetpoint);
+          }
+        }
       }
     }
     return normalized;

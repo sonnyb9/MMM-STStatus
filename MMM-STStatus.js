@@ -417,6 +417,22 @@ Module.register("MMM-STStatus", {
       parts.push('<span class="secondary-item"><i class="fas fa-sliders"></i> ' + device.level + '%</span>');
     }
 
+    // Add thermostat setpoints for temperature devices (thermostats)
+    if (device.heatingSetpoint !== undefined || device.coolingSetpoint !== undefined) {
+      let setpointText = '';
+      if (device.heatingSetpoint !== undefined && device.coolingSetpoint !== undefined) {
+        // Show both setpoints for auto mode
+        setpointText = this.formatTemperature(device.heatingSetpoint) + ' - ' + this.formatTemperature(device.coolingSetpoint);
+      } else if (device.heatingSetpoint !== undefined) {
+        setpointText = 'Heat: ' + this.formatTemperature(device.heatingSetpoint);
+      } else if (device.coolingSetpoint !== undefined) {
+        setpointText = 'Cool: ' + this.formatTemperature(device.coolingSetpoint);
+      }
+      if (setpointText) {
+        parts.push('<span class="secondary-item"><i class="fas fa-crosshairs"></i> ' + setpointText + '</span>');
+      }
+    }
+
     return parts.join(" ");
   },
 
