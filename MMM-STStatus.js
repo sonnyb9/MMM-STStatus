@@ -11,7 +11,9 @@ Module.register("MMM-STStatus", {
 
   // Default configuration
   defaults: {
-    token: "",                    // SmartThings Personal Access Token (required)
+    token: "",                    // SmartThings Personal Access Token (legacy)
+    clientId: "",                 // OAuth Client ID (recommended)
+    clientSecret: "",             // OAuth Client Secret (recommended)
     devices: [],                  // Explicit device list: [{ id: "xxx", name: "Name" }]
     rooms: [],                    // Room names to include: ["Living Room", "Kitchen"]
     pollInterval: 60000,          // Polling interval in ms (default: 60 seconds)
@@ -78,9 +80,12 @@ Module.register("MMM-STStatus", {
   start: function () {
     Log.info("[MMM-STStatus] Starting module...");
 
-    // Validate configuration
-    if (!this.config.token && !this.config.testMode) {
-      this.error = "No SmartThings token configured.";
+    // Validate configuration - need either OAuth (clientId + clientSecret) or PAT (token)
+    const hasOAuth = this.config.clientId && this.config.clientSecret;
+    const hasPAT = this.config.token;
+    
+    if (!hasOAuth && !hasPAT && !this.config.testMode) {
+      this.error = "No authentication configured. Set clientId/clientSecret (OAuth) or token (PAT).";
       Log.error("[MMM-STStatus] ERROR: " + this.error);
       return;
     }

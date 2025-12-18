@@ -1,6 +1,6 @@
 /* node_helper.js
  * Backend helper for MMM-STStatus
- * Handles SmartThings API communication, caching, and rate limiting
+ * Handles SmartThings API communication, caching, rate limiting, and OAuth token management
  */
 
 const NodeHelper = require("node_helper");
@@ -8,6 +8,12 @@ const fetch = require("node-fetch");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const {
+  loadTokens,
+  saveTokens,
+  tokensNeedRefresh,
+  getTokenFilePath
+} = require("./oauth-utils");
 
 module.exports = NodeHelper.create({
   // Configuration
@@ -15,6 +21,7 @@ module.exports = NodeHelper.create({
 
   // API settings
   API_BASE: "https://api.smartthings.com/v1",
+  TOKEN_URL: "https://api.smartthings.com/oauth/token",
   RATE_LIMIT: 250,           // requests per minute
   RATE_WARNING: 200,         // warn at this threshold
 
@@ -22,9 +29,15 @@ module.exports = NodeHelper.create({
   requestCount: 0,
   requestResetTime: null,
   pollTimer: null,
+  tokenRefreshTimer: null,
   backoffDelay: 0,
   locationId: null,
   deviceList: [],
+  authFailed: false,
+
+  // OAuth tokens
+  tokens: null,
+  tokenFile: null,
 
   // Cache
   cacheFile: null,
@@ -37,26 +50,34 @@ module.exports = NodeHelper.create({
   start: function () {
     console.log("[MMM-STStatus] Node helper started");
     this.cacheFile = path.join(__dirname, ".cache.json");
+    this.tokenFile = getTokenFilePath(__dirname);
     this.resetRateLimit();
   },
-  /** 
-   * * Handle socket notifications from frontend 
-   * */
+
+  /**
+   * Handle socket notifications from frontend
+   */
   socketNotificationReceived: function (notification, payload) {
     if (notification === "SET_CONFIG") {
       this.config = payload;
 
-      console.log(
-        "[MMM-STStatus] Token received:",
-        this.config && this.config.token
-          ? this.config.token.slice(0, 6) + "…"
-          : "MISSING"
-      );
+      // Determine authentication mode
+      if (this.config.clientId && this.config.clientSecret) {
+        console.log("[MMM-STStatus] OAuth mode: Client ID received");
+      } else if (this.config.token) {
+        console.log(
+          "[MMM-STStatus] PAT mode: Token received:",
+          this.config.token.slice(0, 6) + "…"
+        );
+      } else {
+        console.log("[MMM-STStatus] WARNING: No authentication configured");
+      }
 
       this.log("Config received", true);
       this.initialize();
     }
   },
+
   /**
    * Initialize the module
    */
@@ -78,6 +99,12 @@ module.exports = NodeHelper.create({
       return;
     }
 
+    // Initialize authentication
+    const authReady = await this.initializeAuth();
+    if (!authReady) {
+      return;
+    }
+
     // Send cached data immediately if available (faster startup)
     if (this.cache && this.cache.lastStatus) {
       this.log("Sending cached data for fast startup", true);
@@ -91,6 +118,184 @@ module.exports = NodeHelper.create({
     this.sendSocketNotification("LOADING", {});
     await this.fetchDevices();
     this.startPolling();
+  },
+
+  /**
+   * Initialize authentication (OAuth or PAT)
+   * @returns {boolean} True if authentication is ready
+   */
+  initializeAuth: async function () {
+    // OAuth mode
+    if (this.config.clientId && this.config.clientSecret) {
+      return await this.initializeOAuth();
+    }
+
+    // PAT mode (legacy)
+    if (this.config.token) {
+      this.log("Using Personal Access Token (legacy mode)");
+      return true;
+    }
+
+    // No authentication
+    this.sendSocketNotification("ERROR", {
+      message: "No authentication configured. Please set up OAuth or provide a PAT."
+    });
+    return false;
+  },
+
+  /**
+   * Initialize OAuth - load tokens and set up refresh
+   * @returns {boolean} True if OAuth is ready
+   */
+  initializeOAuth: async function () {
+    this.log("Initializing OAuth authentication", true);
+
+    // Load tokens from encrypted file
+    this.tokens = loadTokens(this.tokenFile, this.config.clientId, this.config.clientSecret);
+
+    if (!this.tokens) {
+      console.error("[MMM-STStatus] ERROR: No OAuth tokens found. Please run oauth-setup.js first.");
+      this.sendSocketNotification("ERROR", {
+        message: "OAuth tokens not found. Please run: node oauth-setup.js"
+      });
+      return false;
+    }
+
+    this.log("OAuth tokens loaded successfully", true);
+
+    // Check if tokens need refresh
+    if (tokensNeedRefresh(this.tokens)) {
+      this.log("Tokens expired or expiring soon, refreshing...");
+      const refreshed = await this.refreshTokens();
+      if (!refreshed) {
+        return false;
+      }
+    }
+
+    // Schedule automatic token refresh (every 20 hours to be safe before 24h expiry)
+    this.scheduleTokenRefresh();
+
+    return true;
+  },
+
+  /**
+   * Schedule automatic token refresh
+   */
+  scheduleTokenRefresh: function () {
+    if (this.tokenRefreshTimer) {
+      clearInterval(this.tokenRefreshTimer);
+    }
+
+    // Refresh every 20 hours (72000000 ms)
+    // Tokens expire in 24 hours, so this gives us a 4-hour buffer
+    const refreshInterval = 20 * 60 * 60 * 1000;
+
+    this.log("Scheduling token refresh every 20 hours", true);
+
+    this.tokenRefreshTimer = setInterval(async () => {
+      this.log("Scheduled token refresh triggered");
+      await this.refreshTokens();
+    }, refreshInterval);
+
+    // Also refresh if tokens will expire within the next hour
+    if (this.tokens && this.tokens.expiresAt) {
+      const expiresIn = new Date(this.tokens.expiresAt).getTime() - Date.now();
+      if (expiresIn < 60 * 60 * 1000 && expiresIn > 0) {
+        // Refresh in 1 minute if expiring within an hour
+        this.log("Tokens expiring soon, scheduling immediate refresh", true);
+        setTimeout(async () => {
+          await this.refreshTokens();
+        }, 60000);
+      }
+    }
+  },
+
+  /**
+   * Refresh OAuth tokens
+   * @returns {boolean} True if refresh was successful
+   */
+  refreshTokens: async function () {
+    if (!this.tokens || !this.tokens.refresh_token) {
+      console.error("[MMM-STStatus] ERROR: No refresh token available");
+      this.sendSocketNotification("ERROR", {
+        message: "OAuth refresh token missing. Please re-run oauth-setup.js"
+      });
+      return false;
+    }
+
+    this.log("Refreshing OAuth tokens...");
+
+    try {
+      const params = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: this.tokens.refresh_token,
+        client_id: this.config.clientId,
+        client_secret: this.config.clientSecret
+      });
+
+      const response = await fetch(this.TOKEN_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: params.toString()
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Token refresh failed (HTTP ${response.status}): ${errorText}`);
+      }
+
+      const newTokens = await response.json();
+
+      // Update tokens
+      this.tokens = {
+        access_token: newTokens.access_token,
+        refresh_token: newTokens.refresh_token || this.tokens.refresh_token, // Keep old refresh token if not returned
+        token_type: newTokens.token_type || "Bearer",
+        scope: newTokens.scope || this.tokens.scope,
+        expiresAt: new Date(Date.now() + (newTokens.expires_in || 86400) * 1000).toISOString(),
+        obtainedAt: new Date().toISOString()
+      };
+
+      // Save encrypted tokens
+      saveTokens(this.tokenFile, this.tokens, this.config.clientId, this.config.clientSecret);
+
+      this.log("OAuth tokens refreshed successfully");
+      this.authFailed = false;
+
+      return true;
+
+    } catch (err) {
+      console.error("[MMM-STStatus] ERROR: Token refresh failed:", err.message);
+
+      // Check if it's an invalid_grant error (refresh token revoked)
+      if (err.message.includes("invalid_grant") || err.message.includes("401")) {
+        this.authFailed = true;
+        this.sendSocketNotification("ERROR", {
+          message: "OAuth refresh token invalid. Please re-run oauth-setup.js",
+          cached: !!this.cache,
+          devices: this.cache ? this.cache.lastStatus : null,
+          timestamp: this.cache ? this.cache.timestamp : null
+        });
+      }
+
+      return false;
+    }
+  },
+
+  /**
+   * Get the current access token (OAuth or PAT)
+   * @returns {string|null} Access token or null
+   */
+  getAccessToken: function () {
+    // OAuth mode
+    if (this.config.clientId && this.config.clientSecret) {
+      return this.tokens ? this.tokens.access_token : null;
+    }
+
+    // PAT mode
+    return this.config.token || null;
   },
 
   /**
@@ -116,6 +321,15 @@ module.exports = NodeHelper.create({
     // Stop immediately if authentication has failed
     if (this.authFailed) {
       return;
+    }
+
+    // Check if tokens need refresh before making requests
+    if (this.config.clientId && this.config.clientSecret && tokensNeedRefresh(this.tokens, 600)) {
+      this.log("Tokens need refresh before API calls", true);
+      const refreshed = await this.refreshTokens();
+      if (!refreshed) {
+        return;
+      }
     }
 
     try {
@@ -257,6 +471,12 @@ module.exports = NodeHelper.create({
       await this.delay(this.backoffDelay);
     }
 
+    // Get access token
+    const accessToken = this.getAccessToken();
+    if (!accessToken) {
+      throw new Error("No access token available");
+    }
+
     // Track request count
     this.requestCount++;
     if (this.requestCount >= this.RATE_WARNING) {
@@ -269,7 +489,7 @@ module.exports = NodeHelper.create({
     const response = await fetch(url, {
       method: "GET",
       headers: {
-        "Authorization": "Bearer " + this.config.token,
+        "Authorization": "Bearer " + accessToken,
         "Content-Type": "application/json"
       }
     });
@@ -295,6 +515,16 @@ module.exports = NodeHelper.create({
     switch (status) {
       case 401:
       case 403:
+        // Auth failure - try to refresh tokens first (OAuth mode)
+        if (this.config.clientId && this.config.clientSecret && !this.authFailed) {
+          console.warn("[MMM-STStatus] Auth error (HTTP " + status + "), attempting token refresh...");
+          const refreshed = await this.refreshTokens();
+          if (refreshed) {
+            // Don't throw, let the caller retry
+            throw new Error("Token refreshed, retry request");
+          }
+        }
+
         // Auth failure - stop polling
         console.error("[MMM-STStatus] ERROR: Authentication failed (HTTP " + status + ")");
         this.authFailed = true;
@@ -302,8 +532,13 @@ module.exports = NodeHelper.create({
           clearInterval(this.pollTimer);
           this.pollTimer = null;
         }
+
+        const authMessage = this.config.clientId
+          ? "SmartThings authentication failed. Please re-run oauth-setup.js"
+          : "SmartThings authentication failed. Check your Personal Access Token.";
+
         this.sendSocketNotification("ERROR", {
-          message: "SmartThings authentication failed. Check your Personal Access Token.",
+          message: authMessage,
           cached: !!this.cache,
           devices: this.cache ? this.cache.lastStatus : null,
           timestamp: this.cache ? this.cache.timestamp : null
@@ -350,6 +585,11 @@ module.exports = NodeHelper.create({
 
     // For auth errors, the message was already sent
     if (message === "Authentication failed") {
+      return;
+    }
+
+    // For token refresh retry, don't show error
+    if (message === "Token refreshed, retry request") {
       return;
     }
 
@@ -765,6 +1005,7 @@ module.exports = NodeHelper.create({
 
   hashConfig: function (config) {
     const relevant = {
+      clientId: config.clientId,
       token: config.token,
       devices: config.devices,
       rooms: config.rooms
