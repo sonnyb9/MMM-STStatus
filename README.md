@@ -202,6 +202,23 @@ Configure with:
 | Window Shade/Blinds | ##% | `fa-window-maximize` |
 | Dimmer | ##% | `fa-sliders` |
 
+## Translations
+
+The module supports multiple languages. Set the `language` option in your MagicMirror `config.js` to use a different language:
+
+```javascript
+language: "de",  // German
+```
+
+**Supported languages:**
+- `en` - English (default)
+- `de` - German (Deutsch)
+- `fr` - French (Français)
+- `es` - Spanish (Español)
+- `nl` - Dutch (Nederlands)
+
+Contributions for additional languages are welcome! See the `translations/` folder for examples.
+
 ### Thermostat Features
 
 For thermostats (like Ecobee), the module displays:
@@ -307,6 +324,12 @@ MMM-STStatus/
 ├── oauth-tokens.enc       # Encrypted tokens (created by setup)
 ├── css/
 │   └── MMM-STStatus.css   # Styles
+├── translations/          # Language files
+│   ├── en.json            # English
+│   ├── de.json            # German
+│   ├── fr.json            # French
+│   ├── es.json            # Spanish
+│   └── nl.json            # Dutch
 ├── package.json
 ├── README.md
 └── .cache.json            # Device cache (auto-generated)

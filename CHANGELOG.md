@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.1] – 2025-12-18
+
+### Added
+- **Multi-language support** with translations for 5 languages
+  - English (en) - default
+  - German (de)
+  - French (fr)
+  - Spanish (es)
+  - Dutch (nl)
+- `getTranslations()` method for MagicMirror i18n integration
+- Translation files in `translations/` folder
+
+### Changed
+- All user-facing strings now use MagicMirror's translation system
+- README updated with Translations section and corrected icon names
+- Credits section updated with GitHub link for MMM-Ecobee
+
+---
+
+## [0.3.0] – 2025-12-18
+
+### Added
+- **OAuth 2.0 authentication** with automatic token refresh (recommended over PAT)
+- Interactive `oauth-setup.js` script for credential setup
+- AES-256-GCM encryption for secure token storage (`oauth-tokens.enc`)
+- Support for both OAuth (`clientId`/`clientSecret`) and legacy PAT (`token`) authentication
+- Detailed OAuth setup instructions in README
+- Tokens refresh automatically every 20 hours (before 24-hour expiration)
+- Encrypted token files can be safely synced via cloud storage (iCloud, etc.)
+
+### Fixed
+- Token exchange now uses Basic Auth header (required by SmartThings API)
+- Frontend validation now accepts OAuth credentials (`clientId`/`clientSecret`)
+- Updated redirect URI to `httpbin.org/get` for reliable authorization code capture
+
+### Changed
+- README significantly updated with OAuth setup guide and troubleshooting
+- Moved PAT authentication to "legacy" status in documentation
+
+---
+
 ## [0.2.0] – 2025-12-17
 
 ### Added

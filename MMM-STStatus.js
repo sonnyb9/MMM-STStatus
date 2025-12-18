@@ -85,13 +85,13 @@ Module.register("MMM-STStatus", {
     const hasPAT = this.config.token;
     
     if (!hasOAuth && !hasPAT && !this.config.testMode) {
-      this.error = "No authentication configured. Set clientId/clientSecret (OAuth) or token (PAT).";
+      this.error = this.translate("ERROR_NO_AUTH");
       Log.error("[MMM-STStatus] ERROR: " + this.error);
       return;
     }
 
     if (this.config.devices.length === 0 && this.config.rooms.length === 0 && !this.config.testMode) {
-      this.error = "No devices or rooms configured.";
+      this.error = this.translate("ERROR_NO_DEVICES");
       Log.error("[MMM-STStatus] ERROR: " + this.error);
       return;
     }
@@ -108,6 +108,19 @@ Module.register("MMM-STStatus", {
       this.file("node_modules/@fortawesome/fontawesome-free/css/all.min.css"),
       this.file("css/MMM-STStatus.css")
     ];
+  },
+
+  /**
+   * Load translations
+   */
+  getTranslations: function () {
+    return {
+      en: "translations/en.json",
+      de: "translations/de.json",
+      fr: "translations/fr.json",
+      es: "translations/es.json",
+      nl: "translations/nl.json"
+    };
   },
 
   /**
@@ -171,14 +184,14 @@ Module.register("MMM-STStatus", {
     if (this.deviceData.length > 0) {
       wrapper.appendChild(this.getDeviceTable());
     } else if (!this.error) {
-      wrapper.innerHTML = '<div class="no-devices">No devices found</div>';
+      wrapper.innerHTML = '<div class="no-devices">' + this.translate("NO_DEVICES") + '</div>';
     }
 
     // Show last updated timestamp
     if (this.config.showLastUpdated && this.lastUpdate) {
       const footer = document.createElement("div");
       footer.className = "last-updated";
-      footer.innerHTML = "Updated: " + this.formatTime(this.lastUpdate);
+      footer.innerHTML = this.translate("UPDATED") + ": " + this.formatTime(this.lastUpdate);
       wrapper.appendChild(footer);
     }
 
@@ -189,7 +202,7 @@ Module.register("MMM-STStatus", {
    * Generate loading HTML
    */
   getLoadingHtml: function () {
-    return '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading devices...</div>';
+    return '<div class="loading"><i class="fas fa-spinner fa-spin"></i> ' + this.translate("LOADING") + '</div>';
   },
 
   /**
@@ -227,7 +240,7 @@ Module.register("MMM-STStatus", {
     // Name cell
     const nameCell = document.createElement("td");
     nameCell.className = "device-name";
-    nameCell.textContent = device.name || device.label || "Unknown Device";
+    nameCell.textContent = device.name || device.label || this.translate("UNKNOWN_DEVICE");
     row.appendChild(nameCell);
 
     // Primary status cell
@@ -306,27 +319,27 @@ Module.register("MMM-STStatus", {
     // Normalize display values
     switch (capability) {
       case "switch":
-        displayValue = state === "on" ? "ON" : "OFF";
+        displayValue = state === "on" ? this.translate("ON") : this.translate("OFF");
         stateClass = state === "on" ? "state-on" : "state-off";
         break;
 
       case "lock":
-        displayValue = state === "locked" ? "LOCKED" : "UNLOCKED";
+        displayValue = state === "locked" ? this.translate("LOCKED") : this.translate("UNLOCKED");
         stateClass = state === "locked" ? "state-locked" : "state-unlocked";
         break;
 
       case "contact":
-        displayValue = state === "open" ? "OPEN" : "CLOSED";
+        displayValue = state === "open" ? this.translate("OPEN") : this.translate("CLOSED");
         stateClass = state === "open" ? "state-open" : "state-closed";
         break;
 
       case "motion":
-        displayValue = state === "active" ? "MOTION" : "—";
+        displayValue = state === "active" ? this.translate("MOTION") : "—";
         stateClass = state === "active" ? "state-motion" : "state-inactive";
         break;
 
       case "presence":
-        displayValue = state === "present" ? "HOME" : "AWAY";
+        displayValue = state === "present" ? this.translate("HOME") : this.translate("AWAY");
         stateClass = state === "present" ? "state-home" : "state-away";
         break;
 
@@ -429,9 +442,9 @@ Module.register("MMM-STStatus", {
         // Show both setpoints for auto mode
         setpointText = this.formatTemperature(device.heatingSetpoint) + ' - ' + this.formatTemperature(device.coolingSetpoint);
       } else if (device.heatingSetpoint !== undefined) {
-        setpointText = 'Heat: ' + this.formatTemperature(device.heatingSetpoint);
+        setpointText = this.translate("HEAT") + ': ' + this.formatTemperature(device.heatingSetpoint);
       } else if (device.coolingSetpoint !== undefined) {
-        setpointText = 'Cool: ' + this.formatTemperature(device.coolingSetpoint);
+        setpointText = this.translate("COOL") + ': ' + this.formatTemperature(device.coolingSetpoint);
       }
       if (setpointText) {
         parts.push('<span class="secondary-item"><i class="fas fa-crosshairs"></i> ' + setpointText + '</span>');
