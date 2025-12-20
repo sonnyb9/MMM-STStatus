@@ -4,8 +4,13 @@ node_modules/
 # Cache files
 .cache.json
 
-# OAuth tokens (user-specific, do not commit)
+# OAuth data (user-specific, do not commit)
 oauth-tokens.enc
+oauth-data.enc
+oauth-key.bin
+
+# Project development docs (personal notes)
+Project Docs/
 
 # OS files
 .DS_Store

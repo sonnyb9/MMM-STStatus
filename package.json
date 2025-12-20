@@ -1,6 +1,6 @@
 {
   "name": "mmm-ststatus",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "MagicMirror² module for SmartThings device status display",
   "main": "MMM-STStatus.js",
   "scripts": {
@@ -15,14 +15,14 @@
     "iot",
     "home-automation"
   ],
-  "author": "",
+  "author": "Sonny Bertoncini",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/sonnyb9/MMM-STStatus.git"
   },
   "bugs": {
-    "url": ""
+    "url": "https://github.com/sonnyb9/MMM-STStatus/issues"
   },
   "engines": {
     "node": ">=18.0.0"

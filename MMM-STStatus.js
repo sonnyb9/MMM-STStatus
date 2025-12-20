@@ -1,7 +1,7 @@
 /* MMM-STStatus.js
  * MagicMirror² module for displaying SmartThings device status
  * 
- * By: Your Name
+ * By: Sonny Bertoncini
  * License: MIT
  */
 
@@ -11,9 +11,7 @@ Module.register("MMM-STStatus", {
 
   // Default configuration
   defaults: {
-    token: "",                    // SmartThings Personal Access Token (legacy)
-    clientId: "",                 // OAuth Client ID (recommended)
-    clientSecret: "",             // OAuth Client Secret (recommended)
+    token: "",                    // Legacy: SmartThings Personal Access Token (deprecated)
     devices: [],                  // Explicit device list: [{ id: "xxx", name: "Name" }]
     rooms: [],                    // Room names to include: ["Living Room", "Kitchen"]
     pollInterval: 60000,          // Polling interval in ms (default: 60 seconds)
@@ -73,6 +71,7 @@ Module.register("MMM-STStatus", {
   loading: true,
   error: null,
   lastUpdate: null,
+  currentAlert: null,  // { type: string, messageKey: string }
 
   /**
    * Called when module starts
@@ -80,16 +79,8 @@ Module.register("MMM-STStatus", {
   start: function () {
     Log.info("[MMM-STStatus] Starting module...");
 
-    // Validate configuration - need either OAuth (clientId + clientSecret) or PAT (token)
-    const hasOAuth = this.config.clientId && this.config.clientSecret;
-    const hasPAT = this.config.token;
-    
-    if (!hasOAuth && !hasPAT && !this.config.testMode) {
-      this.error = this.translate("ERROR_NO_AUTH");
-      Log.error("[MMM-STStatus] ERROR: " + this.error);
-      return;
-    }
-
+    // Config validation is minimal now - OAuth data is loaded from encrypted file by node_helper
+    // Only validate that we have devices/rooms configured (unless in test mode)
     if (this.config.devices.length === 0 && this.config.rooms.length === 0 && !this.config.testMode) {
       this.error = this.translate("ERROR_NO_DEVICES");
       Log.error("[MMM-STStatus] ERROR: " + this.error);
@@ -156,6 +147,21 @@ Module.register("MMM-STStatus", {
         this.loading = true;
         this.updateDom();
         break;
+
+      case "ALERT":
+        this.currentAlert = {
+          type: payload.type,
+          messageKey: payload.messageKey
+        };
+        Log.warn("[MMM-STStatus] Alert: " + payload.type);
+        this.updateDom();
+        break;
+
+      case "ALERT_CLEAR":
+        this.currentAlert = null;
+        Log.info("[MMM-STStatus] Alert cleared");
+        this.updateDom();
+        break;
     }
   },
 
@@ -187,11 +193,16 @@ Module.register("MMM-STStatus", {
       wrapper.innerHTML = '<div class="no-devices">' + this.translate("NO_DEVICES") + '</div>';
     }
 
-    // Show last updated timestamp
-    if (this.config.showLastUpdated && this.lastUpdate) {
+    // Footer: Show alert OR last update time (alert takes precedence)
+    if (this.currentAlert) {
+      const alertDiv = document.createElement("div");
+      alertDiv.className = "footer-alert";
+      alertDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + this.translate(this.currentAlert.messageKey);
+      wrapper.appendChild(alertDiv);
+    } else if (this.config.showLastUpdated && this.lastUpdate) {
       const footer = document.createElement("div");
       footer.className = "last-updated";
-      footer.innerHTML = this.translate("UPDATED") + ": " + this.formatTime(this.lastUpdate);
+      footer.innerHTML = this.translate("LAST_UPDATE") + ": " + this.formatTime(this.lastUpdate);
       wrapper.appendChild(footer);
     }
 
@@ -489,10 +500,10 @@ Module.register("MMM-STStatus", {
   },
 
   /**
-   * Format timestamp for display
+   * Format timestamp for display as clock time
    */
   formatTime: function (isoString) {
     const date = new Date(isoString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 });

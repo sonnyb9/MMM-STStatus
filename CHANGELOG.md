@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.2] – 2025-12-19
+
+### Added
+- **Intelligent footer alerts** for API issues with auto-dismiss on recovery
+  - Auth failures (401/invalid_grant) - alert immediately
+  - Permission errors (403) - alert immediately  
+  - Network errors - alert after 10 consecutive failures
+  - Rate limiting (429) - alert after 10 consecutive failures
+  - API outage (500/502/503) - alert after 10 consecutive failures
+  - Schema errors (unexpected API response) - alert after 10 consecutive failures
+- Alert messages in all 5 supported languages
+- Yellow/amber styling for alert visibility
+- Alerts replace "Last Update" footer when active, return when resolved
+- **Secure credential storage** - clientId/clientSecret now stored encrypted, not in config.js
+  - `oauth-key.bin` - random 32-byte encryption key
+  - `oauth-data.enc` - AES-256-GCM encrypted OAuth credentials and tokens
+
+### Changed
+- **Merged setup scripts** - Combined `oauth-setup.js` and `setup.js` into single interactive wizard
+- Setup wizard now handles complete configuration: OAuth, position, rooms, devices, and options
+- **Config.js no longer contains secrets** - only display options like pollInterval, temperatureUnit, etc.
+- Removed PAT (Personal Access Token) support from documentation (24-hour expiration made it impractical)
+- Updated TESTING_GUIDE.md for beta testers (removed VM testing, updated for OAuth-only)
+- Simplified README installation instructions
+- **Last update display** shows clock time of last successful API update (e.g., "Last Update: 10:30:45 AM")
+- Setup wizard prompts now reference README.md for CLI installation details
+- Setup wizard warns that authorization URL expires quickly
+
+### Removed
+- `oauth-setup.js` - functionality merged into `setup.js`
+- `oauth-tokens.enc` - replaced by `oauth-data.enc` (new format includes credentials)
+- clientId/clientSecret from config.js (now stored encrypted)
+- PAT authentication documentation (OAuth is now the only supported method)
+- VM testing instructions from TESTING_GUIDE.md
+
+---
+
 ## [0.3.1] – 2025-12-18
 
 ### Added
@@ -79,36 +116,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Known Issues
-
-### SmartThings Authentication (PAT)
-- The module currently relies on **SmartThings Personal Access Tokens (PATs)**.
-- PATs expire after **24 hours**, which can cause:
-  - Repeated HTTP 401/403 errors
-  - Polling loops and excessive API requests
-  - Degraded MagicMirror performance and SSH responsiveness
-
-### OAuth Migration (Planned)
-- Migration to **SmartThings OAuth authentication** is planned to address:
-  - Token expiration handling
-  - Automatic token refresh
-  - Improved long-term reliability
-- OAuth is not yet implemented.
-
-### Device Coverage
-- Thermostat support has been validated primarily against **Ecobee** devices.
-- Other thermostat vendors (e.g., Nest) are not yet tested and may require:
-  - Additional capability normalization rules
-  - Vendor-specific fallbacks
-
-### UI / UX
-- Battery percentage text is displayed, but:
-  - Thresholds are currently hardcoded
-  - No user-configurable warning levels yet
-- Low-battery visual alerts are present but not configurable.
-
----
-
 ## [0.1.0] – 2025-12-12
 
 ### Added
@@ -135,3 +142,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test mode for development without API access
 - Debug logging option
 - Responsive CSS for different display sizes
+
+---
+
+## Known Issues
+
+### Device Coverage
+- Thermostat support has been validated primarily against **Ecobee** devices.
+- Other thermostat vendors (e.g., Nest, Honeywell) have not been tested and may require additional capability normalization.
+
+### UI / UX
+- Battery warning thresholds are currently hardcoded (20% low, 60% medium).
+- No user-configurable battery warning levels yet.
+
+### SmartThings API
+- The SmartThings cloud API occasionally experiences intermittent failures or slow responses outside the control of this module.
+- Device status updates may be delayed 30-60 seconds depending on SmartThings backend performance.

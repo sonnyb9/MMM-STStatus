@@ -9,10 +9,11 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const {
-  loadTokens,
-  saveTokens,
+  loadOAuthData,
+  saveOAuthData,
   tokensNeedRefresh,
-  getTokenFilePath
+  getDataFilePath,
+  oauthDataExists
 } = require("./oauth-utils");
 
 module.exports = NodeHelper.create({
@@ -35,9 +36,14 @@ module.exports = NodeHelper.create({
   deviceList: [],
   authFailed: false,
 
+  // Alert tracking
+  consecutiveFailures: 0,
+  FAILURE_THRESHOLD: 10,
+  currentAlert: null,  // { type: string, message: string }
+  ALERT_PRIORITY: ["auth", "scope", "network", "rateLimit", "outage", "schema"],
+
   // OAuth tokens
-  tokens: null,
-  tokenFile: null,
+  oauthData: null,   // Contains clientId, clientSecret, access_token, refresh_token, etc.
 
   // Cache
   cacheFile: null,
@@ -50,7 +56,6 @@ module.exports = NodeHelper.create({
   start: function () {
     console.log("[MMM-STStatus] Node helper started");
     this.cacheFile = path.join(__dirname, ".cache.json");
-    this.tokenFile = getTokenFilePath(__dirname);
     this.resetRateLimit();
   },
 
@@ -60,19 +65,6 @@ module.exports = NodeHelper.create({
   socketNotificationReceived: function (notification, payload) {
     if (notification === "SET_CONFIG") {
       this.config = payload;
-
-      // Determine authentication mode
-      if (this.config.clientId && this.config.clientSecret) {
-        console.log("[MMM-STStatus] OAuth mode: Client ID received");
-      } else if (this.config.token) {
-        console.log(
-          "[MMM-STStatus] PAT mode: Token received:",
-          this.config.token.slice(0, 6) + "…"
-        );
-      } else {
-        console.log("[MMM-STStatus] WARNING: No authentication configured");
-      }
-
       this.log("Config received", true);
       this.initialize();
     }
@@ -121,50 +113,61 @@ module.exports = NodeHelper.create({
   },
 
   /**
-   * Initialize authentication (OAuth or PAT)
+   * Initialize authentication
+   * Loads OAuth data from encrypted file, falls back to legacy PAT in config
    * @returns {boolean} True if authentication is ready
    */
   initializeAuth: async function () {
-    // OAuth mode
-    if (this.config.clientId && this.config.clientSecret) {
+    // Try loading OAuth data from encrypted file (new approach)
+    if (oauthDataExists(__dirname)) {
       return await this.initializeOAuth();
     }
 
-    // PAT mode (legacy)
+    // Legacy: PAT in config (deprecated but still supported)
     if (this.config.token) {
-      this.log("Using Personal Access Token (legacy mode)");
+      this.log("Using Personal Access Token from config (legacy mode)");
+      console.warn("[MMM-STStatus] WARNING: PAT in config.js is deprecated. Run setup.js for secure OAuth.");
       return true;
     }
 
-    // No authentication
+    // No authentication available
+    console.error("[MMM-STStatus] ERROR: No OAuth data found. Please run: node setup.js");
     this.sendSocketNotification("ERROR", {
-      message: "No authentication configured. Please set up OAuth or provide a PAT."
+      message: "No OAuth data found. Please run: node setup.js"
     });
     return false;
   },
 
   /**
-   * Initialize OAuth - load tokens and set up refresh
+   * Initialize OAuth - load data from encrypted file and set up refresh
    * @returns {boolean} True if OAuth is ready
    */
   initializeOAuth: async function () {
     this.log("Initializing OAuth authentication", true);
 
-    // Load tokens from encrypted file
-    this.tokens = loadTokens(this.tokenFile, this.config.clientId, this.config.clientSecret);
+    // Load OAuth data from encrypted file
+    this.oauthData = loadOAuthData(__dirname);
 
-    if (!this.tokens) {
-      console.error("[MMM-STStatus] ERROR: No OAuth tokens found. Please run oauth-setup.js first.");
+    if (!this.oauthData) {
+      console.error("[MMM-STStatus] ERROR: Failed to load OAuth data. Please run setup.js");
       this.sendSocketNotification("ERROR", {
-        message: "OAuth tokens not found. Please run: node oauth-setup.js"
+        message: "OAuth data corrupted or key missing. Please re-run: node setup.js"
       });
       return false;
     }
 
-    this.log("OAuth tokens loaded successfully", true);
+    if (!this.oauthData.clientId || !this.oauthData.clientSecret) {
+      console.error("[MMM-STStatus] ERROR: OAuth data missing credentials");
+      this.sendSocketNotification("ERROR", {
+        message: "OAuth credentials missing. Please re-run: node setup.js"
+      });
+      return false;
+    }
+
+    this.log("OAuth data loaded successfully", true);
 
     // Check if tokens need refresh
-    if (tokensNeedRefresh(this.tokens)) {
+    if (tokensNeedRefresh(this.oauthData)) {
       this.log("Tokens expired or expiring soon, refreshing...");
       const refreshed = await this.refreshTokens();
       if (!refreshed) {
@@ -198,8 +201,8 @@ module.exports = NodeHelper.create({
     }, refreshInterval);
 
     // Also refresh if tokens will expire within the next hour
-    if (this.tokens && this.tokens.expiresAt) {
-      const expiresIn = new Date(this.tokens.expiresAt).getTime() - Date.now();
+    if (this.oauthData && this.oauthData.expiresAt) {
+      const expiresIn = new Date(this.oauthData.expiresAt).getTime() - Date.now();
       if (expiresIn < 60 * 60 * 1000 && expiresIn > 0) {
         // Refresh in 1 minute if expiring within an hour
         this.log("Tokens expiring soon, scheduling immediate refresh", true);
@@ -215,10 +218,10 @@ module.exports = NodeHelper.create({
    * @returns {boolean} True if refresh was successful
    */
   refreshTokens: async function () {
-    if (!this.tokens || !this.tokens.refresh_token) {
+    if (!this.oauthData || !this.oauthData.refresh_token) {
       console.error("[MMM-STStatus] ERROR: No refresh token available");
       this.sendSocketNotification("ERROR", {
-        message: "OAuth refresh token missing. Please re-run oauth-setup.js"
+        message: "OAuth refresh token missing. Please re-run setup.js"
       });
       return false;
     }
@@ -228,9 +231,9 @@ module.exports = NodeHelper.create({
     try {
       const params = new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: this.tokens.refresh_token,
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret
+        refresh_token: this.oauthData.refresh_token,
+        client_id: this.oauthData.clientId,
+        client_secret: this.oauthData.clientSecret
       });
 
       const response = await fetch(this.TOKEN_URL, {
@@ -248,18 +251,19 @@ module.exports = NodeHelper.create({
 
       const newTokens = await response.json();
 
-      // Update tokens
-      this.tokens = {
+      // Update OAuth data with new tokens
+      this.oauthData = {
+        ...this.oauthData,
         access_token: newTokens.access_token,
-        refresh_token: newTokens.refresh_token || this.tokens.refresh_token, // Keep old refresh token if not returned
+        refresh_token: newTokens.refresh_token || this.oauthData.refresh_token,
         token_type: newTokens.token_type || "Bearer",
-        scope: newTokens.scope || this.tokens.scope,
+        scope: newTokens.scope || this.oauthData.scope,
         expiresAt: new Date(Date.now() + (newTokens.expires_in || 86400) * 1000).toISOString(),
         obtainedAt: new Date().toISOString()
       };
 
-      // Save encrypted tokens
-      saveTokens(this.tokenFile, this.tokens, this.config.clientId, this.config.clientSecret);
+      // Save updated OAuth data
+      saveOAuthData(__dirname, this.oauthData);
 
       this.log("OAuth tokens refreshed successfully");
       this.authFailed = false;
@@ -273,7 +277,7 @@ module.exports = NodeHelper.create({
       if (err.message.includes("invalid_grant") || err.message.includes("401")) {
         this.authFailed = true;
         this.sendSocketNotification("ERROR", {
-          message: "OAuth refresh token invalid. Please re-run oauth-setup.js",
+          message: "OAuth refresh token invalid. Please re-run setup.js",
           cached: !!this.cache,
           devices: this.cache ? this.cache.lastStatus : null,
           timestamp: this.cache ? this.cache.timestamp : null
@@ -285,16 +289,16 @@ module.exports = NodeHelper.create({
   },
 
   /**
-   * Get the current access token (OAuth or PAT)
+   * Get the current access token
    * @returns {string|null} Access token or null
    */
   getAccessToken: function () {
-    // OAuth mode
-    if (this.config.clientId && this.config.clientSecret) {
-      return this.tokens ? this.tokens.access_token : null;
+    // OAuth mode (from encrypted file)
+    if (this.oauthData && this.oauthData.access_token) {
+      return this.oauthData.access_token;
     }
 
-    // PAT mode
+    // Legacy PAT mode (from config)
     return this.config.token || null;
   },
 
@@ -324,7 +328,7 @@ module.exports = NodeHelper.create({
     }
 
     // Check if tokens need refresh before making requests
-    if (this.config.clientId && this.config.clientSecret && tokensNeedRefresh(this.tokens, 600)) {
+    if (this.oauthData && tokensNeedRefresh(this.oauthData, 600)) {
       this.log("Tokens need refresh before API calls", true);
       const refreshed = await this.refreshTokens();
       if (!refreshed) {
@@ -357,12 +361,20 @@ module.exports = NodeHelper.create({
         try {
           const status = await this.fetchDeviceStatus(device.id);
           if (status) {
-            devices.push(this.normalizeDevice(device, status));
+            const normalized = this.normalizeDevice(device, status);
+            if (normalized) {
+              devices.push(normalized);
+            }
           }
         } catch (err) {
+          // Individual device errors don't count as full failures
           this.log("Error fetching device " + device.id + ": " + err.message);
         }
       }
+
+      // SUCCESS - reset failure counter and clear alerts
+      this.consecutiveFailures = 0;
+      this.clearAlert();
 
       // Update cache
       this.updateCache({ lastStatus: devices });
@@ -511,18 +523,40 @@ module.exports = NodeHelper.create({
    */
   handleHttpError: async function (response) {
     const status = response.status;
+    let errorBody = "";
+    
+    try {
+      errorBody = await response.text();
+    } catch (e) {
+      // Ignore read errors
+    }
 
     switch (status) {
+      case 400:
+        // Check for invalid_grant in body
+        if (errorBody.includes("invalid_grant")) {
+          this.recordFailure("auth", "ALERT_AUTH");
+          throw new Error("Invalid grant");
+        }
+        this.recordFailure("outage", "ALERT_OUTAGE");
+        throw new Error("Bad request: " + status);
+
       case 401:
-      case 403:
         // Auth failure - try to refresh tokens first (OAuth mode)
-        if (this.config.clientId && this.config.clientSecret && !this.authFailed) {
+        if (this.oauthData && !this.authFailed) {
           console.warn("[MMM-STStatus] Auth error (HTTP " + status + "), attempting token refresh...");
           const refreshed = await this.refreshTokens();
           if (refreshed) {
             // Don't throw, let the caller retry
             throw new Error("Token refreshed, retry request");
           }
+        }
+
+        // Check for invalid_grant in body
+        if (errorBody.includes("invalid_grant")) {
+          this.recordFailure("auth", "ALERT_AUTH");
+        } else {
+          this.recordFailure("auth", "ALERT_AUTH");
         }
 
         // Auth failure - stop polling
@@ -532,22 +566,18 @@ module.exports = NodeHelper.create({
           clearInterval(this.pollTimer);
           this.pollTimer = null;
         }
-
-        const authMessage = this.config.clientId
-          ? "SmartThings authentication failed. Please re-run oauth-setup.js"
-          : "SmartThings authentication failed. Check your Personal Access Token.";
-
-        this.sendSocketNotification("ERROR", {
-          message: authMessage,
-          cached: !!this.cache,
-          devices: this.cache ? this.cache.lastStatus : null,
-          timestamp: this.cache ? this.cache.timestamp : null
-        });
         throw new Error("Authentication failed");
+
+      case 403:
+        // Permission/scope error
+        this.recordFailure("scope", "ALERT_SCOPE");
+        console.error("[MMM-STStatus] ERROR: Permission denied (HTTP " + status + ")");
+        throw new Error("Permission denied");
 
       case 429:
         // Rate limited - exponential backoff
         this.backoffDelay = Math.min(this.backoffDelay ? this.backoffDelay * 2 : 1000, 30000);
+        this.recordFailure("rateLimit", "ALERT_RATE_LIMIT");
         console.warn("[MMM-STStatus] WARNING: Rate limited, backing off for " + this.backoffDelay + "ms");
         throw new Error("Rate limited");
 
@@ -555,10 +585,12 @@ module.exports = NodeHelper.create({
       case 502:
       case 503:
         // Server error - log and continue
+        this.recordFailure("outage", "ALERT_OUTAGE");
         console.warn("[MMM-STStatus] WARNING: Server error (HTTP " + status + "), will retry");
         throw new Error("Server error: " + status);
 
       default:
+        this.recordFailure("outage", "ALERT_OUTAGE");
         console.error("[MMM-STStatus] ERROR: HTTP " + status);
         throw new Error("HTTP error: " + status);
     }
@@ -569,45 +601,55 @@ module.exports = NodeHelper.create({
    */
   handleError: function (err) {
     const message = err.message || "Unknown error";
+    const code = err.code || "";
+    
     console.error("[MMM-STStatus] ERROR: " + message);
 
     // Check for network errors
-    if (err.code === "ECONNREFUSED" || err.code === "ETIMEDOUT" || err.code === "ENOTFOUND") {
+    if (code === "ECONNREFUSED" || code === "ETIMEDOUT" || code === "ENOTFOUND" || code === "ECONNRESET") {
+      this.recordFailure("network", "ALERT_NETWORK");
       console.warn("[MMM-STStatus] Network error, using cached data if available");
-      this.sendSocketNotification("ERROR", {
-        message: "Unable to reach SmartThings. Showing cached data.",
-        cached: !!this.cache,
-        devices: this.cache ? this.cache.lastStatus : null,
-        timestamp: this.cache ? this.cache.timestamp : null
-      });
       return;
     }
 
-    // For auth errors, the message was already sent
+    // Check for network errors in message (node-fetch style)
+    if (message.match(/ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|network/i)) {
+      this.recordFailure("network", "ALERT_NETWORK");
+      console.warn("[MMM-STStatus] Network error detected in message");
+      return;
+    }
+
+    // For auth errors, already handled in handleHttpError
     if (message === "Authentication failed") {
       return;
     }
 
-    // For token refresh retry, don't show error
+    // For token refresh retry, don't record as failure
     if (message === "Token refreshed, retry request") {
       return;
     }
 
-    // For other errors, continue polling but notify frontend
-    if (this.cache && this.cache.lastStatus) {
-      this.sendSocketNotification("ERROR", {
-        message: "Error fetching data. Showing cached data.",
-        cached: true,
-        devices: this.cache.lastStatus,
-        timestamp: this.cache.timestamp
-      });
+    // For permission errors, already handled
+    if (message === "Permission denied") {
+      return;
     }
+
+    // Generic/unknown errors
+    this.recordFailure("outage", "ALERT_OUTAGE");
   },
 
   /**
    * Normalize device data for frontend
+   * @returns {Object|null} Normalized device or null if parsing failed
    */
   normalizeDevice: function (device, status) {
+    // Check for unexpected response shape
+    if (!status || typeof status !== "object") {
+      this.log("Schema error: status is not an object for device " + device.name, true);
+      this.recordSchemaError();
+      return null;
+    }
+
     const normalized = {
       id: device.id,
       name: device.name,
@@ -1011,6 +1053,78 @@ module.exports = NodeHelper.create({
       rooms: config.rooms
     };
     return crypto.createHash("md5").update(JSON.stringify(relevant)).digest("hex");
+  },
+
+  // ============================================================================
+  // Alert Management
+  // ============================================================================
+
+  /**
+   * Record a failure and potentially trigger an alert
+   * @param {string} type - Alert type: auth, scope, network, rateLimit, outage, schema
+   * @param {string} messageKey - Translation key for the alert message
+   */
+  recordFailure: function (type, messageKey) {
+    this.consecutiveFailures++;
+    this.log("Failure recorded: " + type + " (count: " + this.consecutiveFailures + ")", true);
+
+    // Auth and scope errors are critical - alert immediately
+    if (type === "auth" || type === "scope") {
+      this.setAlert(type, messageKey);
+      return;
+    }
+
+    // Other errors wait for threshold
+    if (this.consecutiveFailures >= this.FAILURE_THRESHOLD) {
+      this.setAlert(type, messageKey);
+    }
+  },
+
+  /**
+   * Set an alert, respecting priority
+   * @param {string} type - Alert type
+   * @param {string} messageKey - Translation key for the alert message
+   */
+  setAlert: function (type, messageKey) {
+    // Check if new alert has higher priority than current
+    if (this.currentAlert) {
+      const currentPriority = this.ALERT_PRIORITY.indexOf(this.currentAlert.type);
+      const newPriority = this.ALERT_PRIORITY.indexOf(type);
+      
+      // Lower index = higher priority
+      if (newPriority >= currentPriority && currentPriority !== -1) {
+        this.log("Alert " + type + " ignored, current alert " + this.currentAlert.type + " has higher priority", true);
+        return;
+      }
+    }
+
+    this.currentAlert = { type: type, messageKey: messageKey };
+    this.log("Alert set: " + type, true);
+
+    // Send alert to frontend
+    this.sendSocketNotification("ALERT", {
+      type: type,
+      messageKey: messageKey
+    });
+  },
+
+  /**
+   * Clear the current alert
+   */
+  clearAlert: function () {
+    if (this.currentAlert) {
+      this.log("Alert cleared: " + this.currentAlert.type, true);
+      this.currentAlert = null;
+      this.sendSocketNotification("ALERT_CLEAR", {});
+    }
+  },
+
+  /**
+   * Record a schema/parsing error
+   * Called when API returns 200 but data cannot be parsed as expected
+   */
+  recordSchemaError: function () {
+    this.recordFailure("schema", "ALERT_SCHEMA");
   },
 
   /**
