@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [0.4.0] – 2025-12-19
+## [0.4.0-beta.1] – 2025-12-19
+
+### Notes
+- First public beta release
+- Feature-complete for initial external testing
+- Not yet broadly tested across different SmartThings environments
+- Feedback requested on:
+  - OAuth setup flow
+  - API reliability and alert behavior
+  - Device normalization across vendors
+  - Rendering across MagicMirror positions
+
+---
+
+## [0.4.0] – Unreleased
 
 ### Added
 - **Intelligent footer alerts** for API issues with auto-dismiss on recovery
@@ -157,4 +171,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### SmartThings API
 - The SmartThings cloud API occasionally experiences intermittent failures or slow responses outside the control of this module.
-- Device status updates may be delayed 30-60 seconds depending on SmartThings backend performance.
+- Device status updates may be delayed 30–60 seconds depending on SmartThings backend performance.
