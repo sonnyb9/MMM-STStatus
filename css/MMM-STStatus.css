@@ -127,6 +127,24 @@
   text-align: right;
 }
 
+/* Footer alert - replaces last-updated when active */
+.mmm-ststatus .footer-alert {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-top: 1px solid rgba(251, 191, 36, 0.3);
+  font-size: 11px;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border-radius: 0 0 5px 5px;
+  text-align: left;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.mmm-ststatus .footer-alert .fa-exclamation-triangle {
+  margin-right: 6px;
+}
+
 /* ================================================
    STATE COLOR CLASSES
    ================================================ */
@@ -308,23 +326,27 @@
  * ========================================================= */
 
 /* Heating */
-.thermostat-heating {
-  color: #ff4d4d; /* red */
+.mmm-ststatus .status-value.thermostat-heating {
+  color: #ff4d4d !important; /* red */
+  background: rgba(255, 77, 77, 0.2);
 }
 
 /* Cooling */
-.thermostat-cooling {
-  color: #4da6ff; /* blue */
+.mmm-ststatus .status-value.thermostat-cooling {
+  color: #4da6ff !important; /* blue */
+  background: rgba(77, 166, 255, 0.2);
 }
 
 /* Fan only */
-.thermostat-fan-only {
-  color: #4dff88; /* green */
+.mmm-ststatus .status-value.thermostat-fan-only {
+  color: #4dff88 !important; /* green */
+  background: rgba(77, 255, 136, 0.2);
 }
 
 /* Idle / default */
-.thermostat-idle {
-  color: #ffffff; /* white */
+.mmm-ststatus .status-value.thermostat-idle {
+  color: #ffffff !important; /* white */
+  background: rgba(255, 255, 255, 0.1);
 }
 
 /* =========================================================

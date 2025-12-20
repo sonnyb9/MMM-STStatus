@@ -1,0 +1,29 @@
+{
+  "LOADING": "Apparaten laden...",
+  "NO_DEVICES": "Geen apparaten gevonden",
+  "LAST_UPDATE": "Laatste update",
+  "UNKNOWN_DEVICE": "Onbekend apparaat",
+  
+  "ON": "AAN",
+  "OFF": "UIT",
+  "OPEN": "OPEN",
+  "CLOSED": "GESLOTEN",
+  "LOCKED": "VERGRENDELD",
+  "UNLOCKED": "ONTGRENDELD",
+  "MOTION": "BEWEGING",
+  "HOME": "THUIS",
+  "AWAY": "AFWEZIG",
+  
+  "HEAT": "Verwarming",
+  "COOL": "Koeling",
+  
+  "ERROR_NO_AUTH": "Geen authenticatie geconfigureerd. Stel clientId/clientSecret (OAuth) of token (PAT) in.",
+  "ERROR_NO_DEVICES": "Geen apparaten of kamers geconfigureerd.",
+  
+  "ALERT_AUTH": "Auth mislukt - voer setup.js uit",
+  "ALERT_SCOPE": "Toegang geweigerd - controleer OAuth scopes",
+  "ALERT_NETWORK": "Netwerkfout - controleer verbinding",
+  "ALERT_RATE_LIMIT": "Rate beperkt - verhoog pollInterval",
+  "ALERT_OUTAGE": "SmartThings niet beschikbaar - opnieuw proberen",
+  "ALERT_SCHEMA": "API-fout - open GitHub issue"
+}

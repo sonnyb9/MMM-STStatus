@@ -1,0 +1,29 @@
+{
+  "LOADING": "Chargement des appareils...",
+  "NO_DEVICES": "Aucun appareil trouvé",
+  "LAST_UPDATE": "Dernière mise à jour",
+  "UNKNOWN_DEVICE": "Appareil inconnu",
+  
+  "ON": "ALLUMÉ",
+  "OFF": "ÉTEINT",
+  "OPEN": "OUVERT",
+  "CLOSED": "FERMÉ",
+  "LOCKED": "VERROUILLÉ",
+  "UNLOCKED": "DÉVERROUILLÉ",
+  "MOTION": "MOUVEMENT",
+  "HOME": "PRÉSENT",
+  "AWAY": "ABSENT",
+  
+  "HEAT": "Chauffage",
+  "COOL": "Climatisation",
+  
+  "ERROR_NO_AUTH": "Aucune authentification configurée. Définissez clientId/clientSecret (OAuth) ou token (PAT).",
+  "ERROR_NO_DEVICES": "Aucun appareil ou pièce configuré.",
+  
+  "ALERT_AUTH": "Auth échouée - exécutez setup.js",
+  "ALERT_SCOPE": "Permission refusée - vérifiez les scopes OAuth",
+  "ALERT_NETWORK": "Erreur réseau - vérifiez la connexion",
+  "ALERT_RATE_LIMIT": "Limite atteinte - augmentez pollInterval",
+  "ALERT_OUTAGE": "SmartThings indisponible - nouvelle tentative",
+  "ALERT_SCHEMA": "Erreur API - ouvrez un ticket GitHub"
+}

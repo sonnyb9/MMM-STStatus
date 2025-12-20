@@ -1,6 +1,6 @@
 {
   "name": "mmm-ststatus",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "MagicMirror² module for SmartThings device status display",
   "main": "MMM-STStatus.js",
   "scripts": {

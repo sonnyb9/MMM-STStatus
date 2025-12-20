@@ -1,18 +1,29 @@
 {
   "LOADING": "Loading devices...",
   "NO_DEVICES": "No devices found",
-  "AUTH_ERROR": "SmartThings authentication failed. Check your Personal Access Token.",
-  "CONNECTION_ERROR": "Unable to reach SmartThings. Showing cached data.",
-  "UPDATED": "Updated",
+  "LAST_UPDATE": "Last Update",
+  "UNKNOWN_DEVICE": "Unknown Device",
   
-  "STATE_ON": "ON",
-  "STATE_OFF": "OFF",
-  "STATE_OPEN": "OPEN",
-  "STATE_CLOSED": "CLOSED",
-  "STATE_LOCKED": "LOCKED",
-  "STATE_UNLOCKED": "UNLOCKED",
-  "STATE_MOTION": "MOTION",
-  "STATE_NO_MOTION": "—",
-  "STATE_HOME": "HOME",
-  "STATE_AWAY": "AWAY"
+  "ON": "ON",
+  "OFF": "OFF",
+  "OPEN": "OPEN",
+  "CLOSED": "CLOSED",
+  "LOCKED": "LOCKED",
+  "UNLOCKED": "UNLOCKED",
+  "MOTION": "MOTION",
+  "HOME": "HOME",
+  "AWAY": "AWAY",
+  
+  "HEAT": "Heat",
+  "COOL": "Cool",
+  
+  "ERROR_NO_AUTH": "No authentication configured. Set clientId/clientSecret (OAuth) or token (PAT).",
+  "ERROR_NO_DEVICES": "No devices or rooms configured.",
+  
+  "ALERT_AUTH": "Auth failed - run setup.js",
+  "ALERT_SCOPE": "Permission denied - check OAuth scopes",
+  "ALERT_NETWORK": "Network error - check connection",
+  "ALERT_RATE_LIMIT": "Rate limited - increase pollInterval",
+  "ALERT_OUTAGE": "SmartThings unavailable - retrying",
+  "ALERT_SCHEMA": "API error - please open GitHub issue"
 }

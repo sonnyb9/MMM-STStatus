@@ -1,0 +1,29 @@
+{
+  "LOADING": "Cargando dispositivos...",
+  "NO_DEVICES": "No se encontraron dispositivos",
+  "LAST_UPDATE": "Última actualización",
+  "UNKNOWN_DEVICE": "Dispositivo desconocido",
+  
+  "ON": "ENCENDIDO",
+  "OFF": "APAGADO",
+  "OPEN": "ABIERTO",
+  "CLOSED": "CERRADO",
+  "LOCKED": "BLOQUEADO",
+  "UNLOCKED": "DESBLOQUEADO",
+  "MOTION": "MOVIMIENTO",
+  "HOME": "EN CASA",
+  "AWAY": "AUSENTE",
+  
+  "HEAT": "Calefacción",
+  "COOL": "Refrigeración",
+  
+  "ERROR_NO_AUTH": "No hay autenticación configurada. Configure clientId/clientSecret (OAuth) o token (PAT).",
+  "ERROR_NO_DEVICES": "No hay dispositivos o habitaciones configuradas.",
+  
+  "ALERT_AUTH": "Auth fallida - ejecute setup.js",
+  "ALERT_SCOPE": "Permiso denegado - verifique scopes OAuth",
+  "ALERT_NETWORK": "Error de red - verifique conexión",
+  "ALERT_RATE_LIMIT": "Límite alcanzado - aumente pollInterval",
+  "ALERT_OUTAGE": "SmartThings no disponible - reintentando",
+  "ALERT_SCHEMA": "Error API - abra issue en GitHub"
+}
