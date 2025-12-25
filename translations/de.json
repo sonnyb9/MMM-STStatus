@@ -17,6 +17,18 @@
   "HEAT": "Heizen",
   "COOL": "Kühlen",
   
+  "TYPE_SWITCH": "Schalter",
+  "TYPE_DOOR_SENSOR": "Türsensor",
+  "TYPE_MOTION_SENSOR": "Bewegungsmelder",
+  "TYPE_LOCK": "Schloss",
+  "TYPE_PRESENCE": "Anwesenheit",
+  "TYPE_THERMOSTAT": "Thermostat",
+  "TYPE_HUMIDITY": "Feuchtigkeit",
+  "TYPE_BLINDS": "Jalousien",
+  "TYPE_DIMMER": "Dimmer",
+  "TYPE_BATTERY": "Batterie",
+  "TYPE_UNKNOWN": "Unbekannt",
+  
   "ERROR_NO_AUTH": "Keine Authentifizierung konfiguriert. Setzen Sie clientId/clientSecret (OAuth) oder token (PAT).",
   "ERROR_NO_DEVICES": "Keine Geräte oder Räume konfiguriert.",
   

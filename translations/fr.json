@@ -17,6 +17,18 @@
   "HEAT": "Chauffage",
   "COOL": "Climatisation",
   
+  "TYPE_SWITCH": "Interrupteur",
+  "TYPE_DOOR_SENSOR": "Capteur de porte",
+  "TYPE_MOTION_SENSOR": "Capteur de mouvement",
+  "TYPE_LOCK": "Serrure",
+  "TYPE_PRESENCE": "Présence",
+  "TYPE_THERMOSTAT": "Thermostat",
+  "TYPE_HUMIDITY": "Humidité",
+  "TYPE_BLINDS": "Stores",
+  "TYPE_DIMMER": "Variateur",
+  "TYPE_BATTERY": "Batterie",
+  "TYPE_UNKNOWN": "Inconnu",
+  
   "ERROR_NO_AUTH": "Aucune authentification configurée. Définissez clientId/clientSecret (OAuth) ou token (PAT).",
   "ERROR_NO_DEVICES": "Aucun appareil ou pièce configuré.",
   

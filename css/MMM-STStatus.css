@@ -87,6 +87,15 @@
   max-width: 150px;
 }
 
+/* Device type */
+.mmm-ststatus .device-type {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  padding-left: 5px;
+  padding-right: 15px;
+}
+
 /* Status value */
 .mmm-ststatus .device-status {
   text-align: right;
@@ -310,6 +319,10 @@
   .mmm-ststatus .device-name {
     max-width: 100px;
     font-size: 12px;
+  }
+  
+  .mmm-ststatus .device-type {
+    display: none;
   }
   
   .mmm-ststatus .device-status {

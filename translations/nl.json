@@ -17,6 +17,18 @@
   "HEAT": "Verwarming",
   "COOL": "Koeling",
   
+  "TYPE_SWITCH": "Schakelaar",
+  "TYPE_DOOR_SENSOR": "Deursensor",
+  "TYPE_MOTION_SENSOR": "Bewegingssensor",
+  "TYPE_LOCK": "Slot",
+  "TYPE_PRESENCE": "Aanwezigheid",
+  "TYPE_THERMOSTAT": "Thermostaat",
+  "TYPE_HUMIDITY": "Vochtigheid",
+  "TYPE_BLINDS": "Jalozieën",
+  "TYPE_DIMMER": "Dimmer",
+  "TYPE_BATTERY": "Batterij",
+  "TYPE_UNKNOWN": "Onbekend",
+  
   "ERROR_NO_AUTH": "Geen authenticatie geconfigureerd. Stel clientId/clientSecret (OAuth) of token (PAT) in.",
   "ERROR_NO_DEVICES": "Geen apparaten of kamers geconfigureerd.",
   

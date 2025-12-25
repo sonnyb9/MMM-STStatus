@@ -134,6 +134,7 @@ pm2 restart MagicMirror
 | `rooms` | Array | `[]` | List of room names to include (e.g., `["Living Room"]`) |
 | `pollInterval` | Number | `60000` | How often to fetch updates (ms, minimum 30000) |
 | `showLastUpdated` | Boolean | `true` | Show clock time of last successful API update (e.g., "Last Update: 10:30:45 AM") |
+| `showDeviceType` | Boolean | `true` | Show device type column (e.g., "Lock", "Door Sensor") |
 | `temperatureUnit` | String | `"F"` | Temperature unit: `"F"` or `"C"` |
 | `defaultSort` | String | `"name"` | Sort by: `"name"`, `"room"`, or `"capability"` |
 | `debug` | Boolean | `false` | Enable verbose console logging |

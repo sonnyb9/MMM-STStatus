@@ -16,6 +16,7 @@ Module.register("MMM-STStatus", {
     rooms: [],                    // Room names to include: ["Living Room", "Kitchen"]
     pollInterval: 60000,          // Polling interval in ms (default: 60 seconds)
     showLastUpdated: true,        // Show last updated timestamp
+    showDeviceType: true,         // Show device type column
     temperatureUnit: "F",         // "F" or "C"
     defaultSort: "name",          // Sort by: "name", "room", "capability"
     debug: false,                 // Enable verbose logging
@@ -64,6 +65,20 @@ Module.register("MMM-STStatus", {
     present: "state-home",
     notPresent: "state-away",
     partially: "state-partially"
+  },
+
+  // Capability to friendly label translation keys
+  CAPABILITY_LABELS: {
+    switch: "TYPE_SWITCH",
+    contact: "TYPE_DOOR_SENSOR",
+    motion: "TYPE_MOTION_SENSOR",
+    lock: "TYPE_LOCK",
+    presence: "TYPE_PRESENCE",
+    temperature: "TYPE_THERMOSTAT",
+    humidity: "TYPE_HUMIDITY",
+    blinds: "TYPE_BLINDS",
+    level: "TYPE_DIMMER",
+    battery: "TYPE_BATTERY"
   },
 
   // Module state
@@ -254,6 +269,14 @@ Module.register("MMM-STStatus", {
     nameCell.textContent = device.name || device.label || this.translate("UNKNOWN_DEVICE");
     row.appendChild(nameCell);
 
+    // Type cell (optional)
+    if (this.config.showDeviceType) {
+      const typeCell = document.createElement("td");
+      typeCell.className = "device-type";
+      typeCell.textContent = this.getDeviceTypeLabel(device);
+      row.appendChild(typeCell);
+    }
+
     // Primary status cell
     const statusCell = document.createElement("td");
     statusCell.className = "device-status";
@@ -267,6 +290,24 @@ Module.register("MMM-STStatus", {
     row.appendChild(secondaryCell);
 
     return row;
+  },
+
+  /**
+   * Get friendly label for device type based on primary capability
+   */
+  getDeviceTypeLabel: function (device) {
+    const capability = device.primaryCapability;
+    
+    if (capability && this.CAPABILITY_LABELS[capability]) {
+      return this.translate(this.CAPABILITY_LABELS[capability]);
+    }
+    
+    // Fallback: capitalize the capability name or show "Unknown"
+    if (capability) {
+      return capability.charAt(0).toUpperCase() + capability.slice(1);
+    }
+    
+    return this.translate("TYPE_UNKNOWN");
   },
 
   /**

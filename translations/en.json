@@ -17,6 +17,18 @@
   "HEAT": "Heat",
   "COOL": "Cool",
   
+  "TYPE_SWITCH": "Switch",
+  "TYPE_DOOR_SENSOR": "Door Sensor",
+  "TYPE_MOTION_SENSOR": "Motion Sensor",
+  "TYPE_LOCK": "Lock",
+  "TYPE_PRESENCE": "Presence",
+  "TYPE_THERMOSTAT": "Thermostat",
+  "TYPE_HUMIDITY": "Humidity",
+  "TYPE_BLINDS": "Blinds",
+  "TYPE_DIMMER": "Dimmer",
+  "TYPE_BATTERY": "Battery",
+  "TYPE_UNKNOWN": "Unknown",
+  
   "ERROR_NO_AUTH": "No authentication configured. Set clientId/clientSecret (OAuth) or token (PAT).",
   "ERROR_NO_DEVICES": "No devices or rooms configured.",
   

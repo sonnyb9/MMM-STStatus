@@ -21,6 +21,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] – 2025-12-21
+
+### Added
+- **Device type column** - Shows friendly device type labels (e.g., "Lock", "Door Sensor", "Switch")
+  - Helps differentiate devices with similar names (e.g., "Front Door" lock vs sensor)
+  - Configurable via `showDeviceType: true/false` (default: true)
+  - Translated labels in all 5 supported languages
+  - Hidden on narrow displays (<400px) for responsiveness
+
+---
+
 ## [0.4.0] – 2025-12-21
 
 ### Added

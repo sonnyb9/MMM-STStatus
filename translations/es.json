@@ -17,6 +17,18 @@
   "HEAT": "Calefacción",
   "COOL": "Refrigeración",
   
+  "TYPE_SWITCH": "Interruptor",
+  "TYPE_DOOR_SENSOR": "Sensor de puerta",
+  "TYPE_MOTION_SENSOR": "Sensor de movimiento",
+  "TYPE_LOCK": "Cerradura",
+  "TYPE_PRESENCE": "Presencia",
+  "TYPE_THERMOSTAT": "Termostato",
+  "TYPE_HUMIDITY": "Humedad",
+  "TYPE_BLINDS": "Persianas",
+  "TYPE_DIMMER": "Regulador",
+  "TYPE_BATTERY": "Batería",
+  "TYPE_UNKNOWN": "Desconocido",
+  
   "ERROR_NO_AUTH": "No hay autenticación configurada. Configure clientId/clientSecret (OAuth) o token (PAT).",
   "ERROR_NO_DEVICES": "No hay dispositivos o habitaciones configuradas.",
   
