@@ -331,12 +331,12 @@ Test mode uses mock data - useful for verifying the module works without SmartTh
 Edit config.js and set:
 ```javascript
 config: {
-  clientId: "test",
-  clientSecret: "test",
   testMode: true,
   debug: true
 }
 ```
+
+**Note:** OAuth credentials are stored in encrypted files, not in config.js.
 
 ### 8.2 Verify Test Mode
 
@@ -502,8 +502,8 @@ node -c ~/MagicMirror/config/config.js
 cd ~/MagicMirror/modules/MMM-STStatus
 node setup.js
 
-# Check if tokens exist
-ls -la oauth-tokens.enc
+# Check if OAuth files exist
+ls -la oauth-key.bin oauth-data.enc
 ```
 
 ### Icons Not Showing
@@ -542,10 +542,10 @@ cat ~/MagicMirror/modules/MMM-STStatus/package.json | grep version
 pm2 logs MagicMirror --lines 200 2>&1 | grep -i ststatus
 ```
 
-### Config (REMOVE SECRETS!)
+### Config
 ```bash
-# Show config without credentials
-cat ~/MagicMirror/config/config.js | grep -A 20 "MMM-STStatus" | sed 's/clientId:.*/clientId: "REDACTED",/' | sed 's/clientSecret:.*/clientSecret: "REDACTED",/'
+# Show config (no secrets are stored in config.js)
+cat ~/MagicMirror/config/config.js | grep -A 20 "MMM-STStatus"
 ```
 
 ### Description
@@ -573,4 +573,4 @@ cat ~/MagicMirror/config/config.js | grep -A 20 "MMM-STStatus" | sed 's/clientId
 
 ---
 
-*Guide Version: 2.1 | Module Version: 0.4.0 | Last Updated: 2025-12-19*
+*Guide Version: 2.2 | Module Version: 0.4.0 | Last Updated: 2025-12-21*

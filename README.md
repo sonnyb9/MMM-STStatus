@@ -214,7 +214,7 @@ Set redirect URI to: `https://httpbin.org/get`
 Authorization codes expire within a few minutes. Run `node setup.js` again and complete the browser authorization promptly.
 
 #### "OAuth tokens not found" when starting module
-Run `node setup.js` to complete OAuth setup. Verify `oauth-tokens.enc` exists in the module directory.
+Run `node setup.js` to complete OAuth setup. Verify `oauth-data.enc` and `oauth-key.bin` exist in the module directory.
 
 #### "OAuth refresh token invalid"
 Refresh tokens expire after 30 days of non-use. Re-run `node setup.js` to get new tokens.
