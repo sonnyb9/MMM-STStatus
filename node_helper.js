@@ -232,14 +232,19 @@ module.exports = NodeHelper.create({
       const params = new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: this.oauthData.refresh_token,
-        client_id: this.oauthData.clientId,
-        client_secret: this.oauthData.clientSecret
+        client_id: this.oauthData.clientId
       });
+
+      // Use Basic Auth header (required by SmartThings)
+      const basicAuth = Buffer.from(
+        this.oauthData.clientId + ":" + this.oauthData.clientSecret
+      ).toString("base64");
 
       const response = await fetch(this.TOKEN_URL, {
         method: "POST",
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": "Basic " + basicAuth
         },
         body: params.toString()
       });
