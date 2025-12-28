@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.2] – 2025-12-28
+
+### Fixed
+- **OAuth token refresh failing with HTTP 401** - Added Basic Auth header to token refresh request, matching SmartThings API requirements. Tokens now auto-refresh correctly every 20 hours.
+
+---
+
 ## [0.4.1] – 2025-12-21
 
 ### Added
