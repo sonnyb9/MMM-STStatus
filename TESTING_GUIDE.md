@@ -573,4 +573,4 @@ cat ~/MagicMirror/config/config.js | grep -A 20 "MMM-STStatus"
 
 ---
 
-*Guide Version: 2.2 | Module Version: 0.4.0 | Last Updated: 2025-12-21*
+*Guide Version: 2.3 | Module Version: 0.4.2 | Last Updated: 2025-12-28*
