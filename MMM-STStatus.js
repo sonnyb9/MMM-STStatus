@@ -17,6 +17,7 @@ Module.register("MMM-STStatus", {
     pollInterval: 60000,          // Polling interval in ms (default: 60 seconds)
     showLastUpdated: true,        // Show last updated timestamp
     showDeviceType: true,         // Show device type column
+    fontSize: 100,                // Font size as percentage (100 = default)
     temperatureUnit: "F",         // "F" or "C"
     defaultSort: "name",          // Sort by: "name", "room", "capability"
     debug: false,                 // Enable verbose logging
@@ -186,6 +187,10 @@ Module.register("MMM-STStatus", {
   getDom: function () {
     const wrapper = document.createElement("div");
     wrapper.className = "mmm-ststatus";
+
+    // Apply font size scaling
+    const fontScale = (this.config.fontSize || 100) / 100;
+    wrapper.style.setProperty("--mmm-ststatus-font-scale", fontScale);
 
     // Show loading state
     if (this.loading && this.deviceData.length === 0) {
