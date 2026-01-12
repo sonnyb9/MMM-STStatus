@@ -142,7 +142,7 @@ Module.register("MMM-STStatus", {
       case "DEVICE_DATA":
         this.loading = false;
         this.error = null;
-        this.deviceData = payload.devices || [];
+        this.deviceData = this.filterDevices(payload.devices || []);
         this.lastUpdate = payload.timestamp || new Date().toISOString();
         this.updateDom();
         break;
@@ -542,6 +542,23 @@ Module.register("MMM-STStatus", {
         default:
           return (a.name || "").localeCompare(b.name || "");
       }
+    });
+  },
+
+  /**
+   * Filter devices based on config.devices array (frontend filtering for multi-instance support)
+   */
+  filterDevices: function (devices) {
+    if (!this.config.devices || this.config.devices.length === 0) {
+      return devices;
+    }
+
+    const configDeviceIds = this.config.devices.map(function (d) {
+      return d.id;
+    });
+
+    return devices.filter(function (device) {
+      return configDeviceIds.indexOf(device.id) !== -1;
     });
   },
 

@@ -21,6 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.4] – 2026-01-12
+
+### Fixed
+- **Multi-instance filtering** - Frontend now filters devices based on `config.devices` array
+  - Fixes issue where multiple MagicMirror instances sharing the same module would show all devices
+  - Each instance now correctly displays only its configured devices
+
+---
+
 ## [0.4.3] – 2025-12-29
 
 ### Added
