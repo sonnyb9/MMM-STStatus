@@ -205,6 +205,32 @@ The module displays alerts in the footer when issues occur. Alerts auto-dismiss 
 
 ### Setup Issues
 
+#### "Network error" during setup or token refresh
+DNS-based ad blockers (Pi-hole, AdGuard Home, Eero Secure, router ad blocking, etc.) may block SmartThings API access.
+
+**Symptoms:**
+- Setup wizard fails with "Network error" but completes other steps
+- Module shows "Network error - check connection" but internet is working
+- `curl https://api.smartthings.com/v1` fails or returns wrong IP
+
+**Solution:**
+1. Access your DNS blocker's admin interface (Pi-hole, Eero app, router settings)
+2. Add to whitelist/allowed sites:
+   - `api.smartthings.com`
+   - `smartthings.com` (covers all SmartThings subdomains)
+3. Restart MagicMirror or re-run `node setup.js`
+
+**Eero users:** Open Eero app → Discover → eero Secure → Block & Allow Sites → Allowed tab → Add Allowed Site
+
+**Verification:**
+```bash
+# Should return real AWS IPs (not 192.168.x.x or 127.0.0.1):
+getent ahosts api.smartthings.com
+
+# Should connect successfully:
+curl -I https://api.smartthings.com/v1
+```
+
 #### "403 Forbidden" when visiting authorization URL
 The redirect URI in your SmartThings app doesn't match. Update it:
 ```bash

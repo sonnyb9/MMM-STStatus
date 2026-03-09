@@ -392,7 +392,13 @@ function exchangeCodeForTokens(code) {
     });
     
     req.on("error", (err) => {
-      reject(new Error(`Network error: ${err.message}`));
+      const msg = `Network error during token exchange: ${err.message}\n\n` +
+        `  💡 Troubleshooting:\n` +
+        `  • Check your internet connection\n` +
+        `  • If using DNS-based ad blocking (Pi-hole, AdGuard, Eero Secure, etc.),\n` +
+        `    whitelist: api.smartthings.com and smartthings.com\n` +
+        `  • Verify api.smartthings.com is accessible: curl https://api.smartthings.com/v1\n`;
+      reject(new Error(msg));
     });
     
     req.write(postData);
@@ -836,7 +842,13 @@ async function apiRequest(endpoint) {
     });
     
     req.on("error", (err) => {
-      reject(new Error(`Network error: ${err.message}`));
+      const msg = `Network error accessing SmartThings API: ${err.message}\n\n` +
+        `  💡 Troubleshooting:\n` +
+        `  • Check your internet connection\n` +
+        `  • If using DNS-based ad blocking (Pi-hole, AdGuard, Eero Secure, etc.),\n` +
+        `    whitelist: api.smartthings.com and smartthings.com\n` +
+        `  • Verify api.smartthings.com is accessible: curl https://api.smartthings.com/v1\n`;
+      reject(new Error(msg));
     });
     
     req.end();
