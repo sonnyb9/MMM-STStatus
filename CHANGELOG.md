@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.5] – 2026-03-27
+
+### Changed
+- **OAuth token refresh interval** - Changed from 20 hours to 12 hours (refreshes twice daily instead of once)
+  - Provides larger safety buffer before 24-hour token expiration
+  - Better resilience against daily service restarts that reset refresh timers
+  - Defense-in-depth approach for environments with automatic restarts
+
+### Fixed
+- **OAuth token expiration after restarts** - Root cause was invalid refresh token, not refresh interval
+  - Resolved by recreating OAuth app with fresh credentials via SmartThings CLI
+  - Module already checks token expiration on startup, but more frequent refreshes provide additional safety
+
+---
+
 ## [0.4.0-beta.1] – 2025-12-19
 
 ### Notes

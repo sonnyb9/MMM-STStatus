@@ -189,11 +189,11 @@ module.exports = NodeHelper.create({
       clearInterval(this.tokenRefreshTimer);
     }
 
-    // Refresh every 20 hours (72000000 ms)
-    // Tokens expire in 24 hours, so this gives us a 4-hour buffer
-    const refreshInterval = 20 * 60 * 60 * 1000;
+    // Refresh every 12 hours (43200000 ms)
+    // Tokens expire in 24 hours, so this gives us a 12-hour buffer
+    const refreshInterval = 12 * 60 * 60 * 1000;
 
-    this.log("Scheduling token refresh every 20 hours", true);
+    this.log("Scheduling token refresh every 12 hours", true);
 
     this.tokenRefreshTimer = setInterval(async () => {
       this.log("Scheduled token refresh triggered");
