@@ -13,6 +13,9 @@ oauth-key.bin
 Project Docs/
 AI-CONTEXT.md
 
+# Local backup files
+node_helper.js.backup*
+
 # OS files
 .DS_Store
 Thumbs.db

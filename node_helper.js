@@ -4,7 +4,7 @@
  */
 
 const NodeHelper = require("node_helper");
-const fetch = require("node-fetch");
+// fetch is available natively in Node.js 18+ (no import needed)
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
@@ -617,7 +617,7 @@ module.exports = NodeHelper.create({
       return;
     }
 
-    // Check for network errors in message (node-fetch style)
+    // Check for network errors surfaced through the error message
     if (message.match(/ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|network/i)) {
       this.recordFailure("network", "ALERT_NETWORK");
       console.warn("[MMM-STStatus] Network error detected in message");
