@@ -6,7 +6,8 @@
   "scripts": {
     "setup": "node setup.js",
     "lint": "eslint *.js",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "echo \"No tests yet\" && exit 0",
+    "test:smartthings": "node test-smartthings.js"
   },
   "keywords": [
     "magicmirror",
