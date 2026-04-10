@@ -144,6 +144,44 @@ pm2 restart MagicMirror
 
 **Note**: Use either `devices` (explicit list) or `rooms` (fetch all devices from rooms), not both.
 
+## SmartThings Test Script
+
+Use the included connectivity check when you want to verify OAuth credentials, confirm device discovery, or inspect normalized SmartThings status data without launching MagicMirror.
+
+```bash
+cd ~/MagicMirror/modules/MMM-STStatus
+npm run test:smartthings
+```
+
+What it does:
+- Loads encrypted OAuth credentials from `oauth-data.enc`
+- Refreshes the access token automatically if it is near expiry
+- Reads `~/MagicMirror/config/config.js` and checks the devices configured for `MMM-STStatus`
+- Falls back to all SmartThings devices if no explicit device list is configured
+- Updates `.cache.json` with the latest successful device status payloads
+
+Optional flags:
+
+```bash
+# Check every SmartThings device, ignoring the MagicMirror config filter
+npm run test:smartthings -- --all
+
+# Print normalized JSON instead of the text summary
+npm run test:smartthings -- --raw
+
+# Show request and discovery details
+npm run test:smartthings -- --debug
+
+# Use a different MagicMirror config file
+npm run test:smartthings -- --config /path/to/config.js
+```
+
+If the script reports `No OAuth data found` or `OAuth data is incomplete`, re-run:
+
+```bash
+node setup.js
+```
+
 ## Supported Device Types
 
 | Capability | Display | Icon (Font Awesome) |

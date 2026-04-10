@@ -15,12 +15,13 @@ This guide provides step-by-step instructions for beta testing the MMM-STStatus 
 5. [Module Installation](#5-module-installation)
 6. [SmartThings OAuth Setup](#6-smartthings-oauth-setup)
 7. [Setup Wizard](#7-setup-wizard)
-8. [Test Mode Testing](#8-test-mode-testing)
-9. [Live Testing](#9-live-testing)
-10. [Functional Test Checklist](#10-functional-test-checklist)
-11. [Performance Testing](#11-performance-testing)
-12. [Troubleshooting](#12-troubleshooting)
-13. [Reporting Issues](#13-reporting-issues)
+8. [CLI Verification Script](#8-cli-verification-script)
+9. [Test Mode Testing](#9-test-mode-testing)
+10. [Live Testing](#10-live-testing)
+11. [Functional Test Checklist](#11-functional-test-checklist)
+12. [Performance Testing](#12-performance-testing)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Reporting Issues](#14-reporting-issues)
 
 ---
 
@@ -322,11 +323,66 @@ pm2 start MagicMirror
 
 ---
 
-## 8. Test Mode Testing
+## 8. CLI Verification Script
+
+Use the standalone SmartThings test script before launching MagicMirror when you want to validate OAuth, device selection, and normalized status output from the terminal.
+
+### 8.1 Run the Default Check
+
+```bash
+cd ~/MagicMirror/modules/MMM-STStatus
+npm run test:smartthings
+```
+
+**What it verifies:**
+- OAuth data can be loaded from `oauth-data.enc`
+- The access token can be refreshed automatically when near expiry
+- `MMM-STStatus` devices can be read from `~/MagicMirror/config/config.js`
+- Current device status can be fetched from the SmartThings API
+- `.cache.json` is updated with the latest successful responses
+
+### 8.2 Useful Flags
+
+```bash
+# Ignore configured devices and fetch every SmartThings device
+npm run test:smartthings -- --all
+
+# Output normalized JSON for debugging
+npm run test:smartthings -- --raw
+
+# Show request/discovery details
+npm run test:smartthings -- --debug
+
+# Read a different MagicMirror config file
+npm run test:smartthings -- --config /path/to/config.js
+```
+
+### 8.3 Expected Output
+
+Successful text output includes:
+- `SmartThings check completed at ...`
+- `Devices checked: N`
+- `Successful updates: N`
+- One line per device with name, ID, room, primary capability/state, and any temperature, humidity, battery, or thermostat details
+
+If a device request fails, the script prints an `ERROR | ...` line for that device while continuing to check the rest.
+
+### 8.4 Common Failures
+
+- `No OAuth data found. Run node setup.js first.`
+- `OAuth data is incomplete. Run node setup.js again.`
+- `Token refresh failed (HTTP 401)` if the stored refresh token is no longer valid
+- `SmartThings API error ...` if the API request fails for discovery or device status
+
+Re-run `node setup.js` if OAuth files are missing or invalid.
+
+---
+
+## 9. Test Mode Testing
 
 Test mode uses mock data - useful for verifying the module works without SmartThings.
 
-### 8.1 Configure Test Mode
+### 9.1 Configure Test Mode
 
 Edit config.js and set:
 ```javascript
@@ -338,7 +394,7 @@ config: {
 
 **Note:** OAuth credentials are stored in encrypted files, not in config.js.
 
-### 8.2 Verify Test Mode
+### 9.2 Verify Test Mode
 
 - [ ] Module appears in configured position
 - [ ] Mock devices are displayed
@@ -350,7 +406,7 @@ config: {
   - Grey: OFF, AWAY
 - [ ] "Last Update: HH:MM:SS" clock time shows
 
-### 8.3 Check Console
+### 9.3 Check Console
 
 ```bash
 pm2 logs MagicMirror --lines 50
@@ -363,25 +419,25 @@ Look for:
 
 ---
 
-## 9. Live Testing
+## 10. Live Testing
 
-### 9.1 Verify Live Data
+### 10.1 Verify Live Data
 
 - [ ] Your actual devices appear
 - [ ] Device names match SmartThings app
 - [ ] States are correct (compare with SmartThings app)
 - [ ] Updates occur at poll interval
 
-### 9.2 Test State Changes
+### 10.2 Test State Changes
 
 1. Open SmartThings app on your phone
 2. Toggle a switch or open/close a door
 3. Wait for poll interval
 4. Verify change appears on mirror
 
-### 9.3 Test OAuth Token Refresh
+### 10.3 Test OAuth Token Refresh
 
-The module auto-refreshes tokens every 20 hours. To test:
+The module auto-refreshes tokens every 12 hours. To test:
 
 1. Note the current time
 2. Check logs after 20+ hours for:
@@ -390,7 +446,7 @@ The module auto-refreshes tokens every 20 hours. To test:
    [MMM-STStatus] Tokens refreshed successfully
    ```
 
-### 9.4 Verify Caching
+### 10.4 Verify Caching
 
 ```bash
 ls -la ~/MagicMirror/modules/MMM-STStatus/.cache.json
@@ -399,7 +455,7 @@ cat ~/MagicMirror/modules/MMM-STStatus/.cache.json | head -20
 
 ---
 
-## 10. Functional Test Checklist
+## 11. Functional Test Checklist
 
 ### Display Tests
 - [ ] Module loads without errors
@@ -448,9 +504,9 @@ cat ~/MagicMirror/modules/MMM-STStatus/.cache.json | head -20
 
 ---
 
-## 11. Performance Testing
+## 12. Performance Testing
 
-### 11.1 Memory Usage
+### 12.1 Memory Usage
 
 ```bash
 # While MagicMirror is running
@@ -462,7 +518,7 @@ watch -n 5 'free -h'
 
 **Expected:** Memory stable, not continuously increasing.
 
-### 11.2 CPU Usage
+### 12.2 CPU Usage
 
 ```bash
 top -o %CPU -n 1 -b | head -20
@@ -470,7 +526,7 @@ top -o %CPU -n 1 -b | head -20
 
 **Expected:** Low CPU except brief spikes during updates.
 
-### 11.3 Long-Running Test
+### 12.3 Long-Running Test
 
 Leave running for 24+ hours and verify:
 - [ ] No memory leaks
@@ -480,7 +536,7 @@ Leave running for 24+ hours and verify:
 
 ---
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 ### Module Not Appearing
 
@@ -523,7 +579,7 @@ npm install
 
 ---
 
-## 13. Reporting Issues
+## 14. Reporting Issues
 
 When reporting bugs, please include:
 
@@ -573,4 +629,4 @@ cat ~/MagicMirror/config/config.js | grep -A 20 "MMM-STStatus"
 
 ---
 
-*Guide Version: 2.3 | Module Version: 0.4.2 | Last Updated: 2025-12-28*
+*Guide Version: 2.4 | Last Updated: 2026-04-10*

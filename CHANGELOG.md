@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- Documentation for the `npm run test:smartthings` verification script in `README.md` and `TESTING_GUIDE.md`
+  - Covers default behavior, supported flags, OAuth/token refresh expectations, and cache updates
+
+---
+
 ## [0.4.5] – 2026-03-27
 
 ### Changed
