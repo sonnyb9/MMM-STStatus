@@ -17,9 +17,6 @@ const {
 } = require("./oauth-utils");
 
 module.exports = NodeHelper.create({
-  // Configuration
-  config: null,
-
   // API settings
   API_BASE: "https://api.smartthings.com/v1",
   TOKEN_URL: "https://api.smartthings.com/oauth/token",
@@ -27,27 +24,16 @@ module.exports = NodeHelper.create({
   RATE_WARNING: 200,         // warn at this threshold
 
   // State
+  instances: {},
   requestCount: 0,
   requestResetTime: null,
-  pollTimer: null,
   tokenRefreshTimer: null,
   backoffDelay: 0,
-  locationId: null,
-  deviceList: [],
-  authFailed: false,
-
-  // Alert tracking
-  consecutiveFailures: 0,
   FAILURE_THRESHOLD: 10,
-  currentAlert: null,  // { type: string, message: string }
   ALERT_PRIORITY: ["auth", "scope", "network", "rateLimit", "outage", "schema"],
 
   // OAuth tokens
   oauthData: null,   // Contains clientId, clientSecret, access_token, refresh_token, etc.
-
-  // Cache
-  cacheFile: null,
-  cache: null,
   CACHE_TTL: 24 * 60 * 60 * 1000, // 24 hours
 
   /**
@@ -55,8 +41,36 @@ module.exports = NodeHelper.create({
    */
   start: function () {
     console.log("[MMM-STStatus] Node helper started");
-    this.cacheFile = path.join(__dirname, ".cache.json");
     this.resetRateLimit();
+  },
+
+  getInstance: function (identifier) {
+    const instanceId = identifier || "default";
+
+    if (!this.instances[instanceId]) {
+      const safeId = instanceId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      this.instances[instanceId] = {
+        id: instanceId,
+        config: null,
+        pollTimer: null,
+        locationId: null,
+        deviceList: [],
+        authFailed: false,
+        consecutiveFailures: 0,
+        currentAlert: null,
+        cacheFile: path.join(__dirname, `.cache-${safeId}.json`),
+        cache: null
+      };
+    }
+
+    return this.instances[instanceId];
+  },
+
+  sendToInstance: function (notification, instance, payload) {
+    const message = Object.assign({}, payload || {}, {
+      identifier: instance.id
+    });
+    this.sendSocketNotification(notification, message);
   },
 
   /**
@@ -64,52 +78,53 @@ module.exports = NodeHelper.create({
    */
   socketNotificationReceived: function (notification, payload) {
     if (notification === "SET_CONFIG") {
-      this.config = payload;
-      this.log("Config received", true);
-      this.initialize();
+      const instance = this.getInstance(payload.identifier);
+      instance.config = payload;
+      this.log("Config received", true, instance);
+      this.initialize(instance);
     }
   },
 
   /**
    * Initialize the module
    */
-  initialize: async function () {
+  initialize: async function (instance) {
     // Load cache
-    this.loadCache();
+    this.loadCache(instance);
 
     // Check if config changed (invalidate cache)
-    const configHash = this.hashConfig(this.config);
-    if (this.cache && this.cache.configHash !== configHash) {
-      this.log("Config changed, invalidating cache", true);
-      this.cache = null;
+    const configHash = this.hashConfig(instance.config);
+    if (instance.cache && instance.cache.configHash !== configHash) {
+      this.log("Config changed, invalidating cache", true, instance);
+      instance.cache = null;
     }
 
     // If test mode, use mock data
-    if (this.config.testMode) {
-      this.log("Test mode enabled, using mock data");
-      this.sendMockData();
+    if (instance.config.testMode) {
+      this.log("Test mode enabled, using mock data", false, instance);
+      this.sendMockData(instance);
       return;
     }
 
     // Initialize authentication
-    const authReady = await this.initializeAuth();
+    const authReady = await this.initializeAuth(instance);
     if (!authReady) {
       return;
     }
 
     // Send cached data immediately if available (faster startup)
-    if (this.cache && this.cache.lastStatus) {
-      this.log("Sending cached data for fast startup", true);
-      this.sendSocketNotification("DEVICE_DATA", {
-        devices: this.cache.lastStatus,
-        timestamp: this.cache.timestamp
+    if (instance.cache && instance.cache.lastStatus) {
+      this.log("Sending cached data for fast startup", true, instance);
+      this.sendToInstance("DEVICE_DATA", instance, {
+        devices: instance.cache.lastStatus,
+        timestamp: instance.cache.timestamp
       });
     }
 
     // Start polling
-    this.sendSocketNotification("LOADING", {});
-    await this.fetchDevices();
-    this.startPolling();
+    this.sendToInstance("LOADING", instance, {});
+    await this.fetchDevices(instance);
+    this.startPolling(instance);
   },
 
   /**
@@ -117,22 +132,22 @@ module.exports = NodeHelper.create({
    * Loads OAuth data from encrypted file, falls back to legacy PAT in config
    * @returns {boolean} True if authentication is ready
    */
-  initializeAuth: async function () {
+  initializeAuth: async function (instance) {
     // Try loading OAuth data from encrypted file (new approach)
     if (oauthDataExists(__dirname)) {
-      return await this.initializeOAuth();
+      return await this.initializeOAuth(instance);
     }
 
     // Legacy: PAT in config (deprecated but still supported)
-    if (this.config.token) {
-      this.log("Using Personal Access Token from config (legacy mode)");
+    if (instance.config.token) {
+      this.log("Using Personal Access Token from config (legacy mode)", false, instance);
       console.warn("[MMM-STStatus] WARNING: PAT in config.js is deprecated. Run setup.js for secure OAuth.");
       return true;
     }
 
     // No authentication available
     console.error("[MMM-STStatus] ERROR: No OAuth data found. Please run: node setup.js");
-    this.sendSocketNotification("ERROR", {
+    this.sendToInstance("ERROR", instance, {
       message: "No OAuth data found. Please run: node setup.js"
     });
     return false;
@@ -142,15 +157,15 @@ module.exports = NodeHelper.create({
    * Initialize OAuth - load data from encrypted file and set up refresh
    * @returns {boolean} True if OAuth is ready
    */
-  initializeOAuth: async function () {
-    this.log("Initializing OAuth authentication", true);
+  initializeOAuth: async function (instance) {
+    this.log("Initializing OAuth authentication", true, instance);
 
     // Load OAuth data from encrypted file
     this.oauthData = loadOAuthData(__dirname);
 
     if (!this.oauthData) {
       console.error("[MMM-STStatus] ERROR: Failed to load OAuth data. Please run setup.js");
-      this.sendSocketNotification("ERROR", {
+      this.sendToInstance("ERROR", instance, {
         message: "OAuth data corrupted or key missing. Please re-run: node setup.js"
       });
       return false;
@@ -158,18 +173,18 @@ module.exports = NodeHelper.create({
 
     if (!this.oauthData.clientId || !this.oauthData.clientSecret) {
       console.error("[MMM-STStatus] ERROR: OAuth data missing credentials");
-      this.sendSocketNotification("ERROR", {
+      this.sendToInstance("ERROR", instance, {
         message: "OAuth credentials missing. Please re-run: node setup.js"
       });
       return false;
     }
 
-    this.log("OAuth data loaded successfully", true);
+    this.log("OAuth data loaded successfully", true, instance);
 
     // Check if tokens need refresh
     if (tokensNeedRefresh(this.oauthData)) {
-      this.log("Tokens expired or expiring soon, refreshing...");
-      const refreshed = await this.refreshTokens();
+      this.log("Tokens expired or expiring soon, refreshing...", false, instance);
+      const refreshed = await this.refreshTokens(instance);
       if (!refreshed) {
         return false;
       }
@@ -217,12 +232,14 @@ module.exports = NodeHelper.create({
    * Refresh OAuth tokens
    * @returns {boolean} True if refresh was successful
    */
-  refreshTokens: async function () {
+  refreshTokens: async function (instance) {
     if (!this.oauthData || !this.oauthData.refresh_token) {
       console.error("[MMM-STStatus] ERROR: No refresh token available");
-      this.sendSocketNotification("ERROR", {
-        message: "OAuth refresh token missing. Please re-run setup.js"
-      });
+      if (instance) {
+        this.sendToInstance("ERROR", instance, {
+          message: "OAuth refresh token missing. Please re-run setup.js"
+        });
+      }
       return false;
     }
 
@@ -271,7 +288,9 @@ module.exports = NodeHelper.create({
       saveOAuthData(__dirname, this.oauthData);
 
       this.log("OAuth tokens refreshed successfully");
-      this.authFailed = false;
+      if (instance) {
+        instance.authFailed = false;
+      }
 
       return true;
 
@@ -280,13 +299,15 @@ module.exports = NodeHelper.create({
 
       // Check if it's an invalid_grant error (refresh token revoked)
       if (err.message.includes("invalid_grant") || err.message.includes("401")) {
-        this.authFailed = true;
-        this.sendSocketNotification("ERROR", {
-          message: "OAuth refresh token invalid. Please re-run setup.js",
-          cached: !!this.cache,
-          devices: this.cache ? this.cache.lastStatus : null,
-          timestamp: this.cache ? this.cache.timestamp : null
-        });
+        if (instance) {
+          instance.authFailed = true;
+          this.sendToInstance("ERROR", instance, {
+            message: "OAuth refresh token invalid. Please re-run setup.js",
+            cached: !!instance.cache,
+            devices: instance.cache ? instance.cache.lastStatus : null,
+            timestamp: instance.cache ? instance.cache.timestamp : null
+          });
+        }
       }
 
       return false;
@@ -297,45 +318,45 @@ module.exports = NodeHelper.create({
    * Get the current access token
    * @returns {string|null} Access token or null
    */
-  getAccessToken: function () {
+  getAccessToken: function (instance) {
     // OAuth mode (from encrypted file)
     if (this.oauthData && this.oauthData.access_token) {
       return this.oauthData.access_token;
     }
 
     // Legacy PAT mode (from config)
-    return this.config.token || null;
+    return instance.config.token || null;
   },
 
   /**
    * Start polling timer
    */
-  startPolling: function () {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
+  startPolling: function (instance) {
+    if (instance.pollTimer) {
+      clearInterval(instance.pollTimer);
     }
 
-    const interval = Math.max(this.config.pollInterval || 60000, 30000); // Min 30 seconds
-    this.log("Starting poll timer: " + (interval / 1000) + "s", true);
+    const interval = Math.max(instance.config.pollInterval || 60000, 30000); // Min 30 seconds
+    this.log("Starting poll timer: " + (interval / 1000) + "s", true, instance);
 
-    this.pollTimer = setInterval(() => {
-      this.fetchDevices();
+    instance.pollTimer = setInterval(() => {
+      this.fetchDevices(instance);
     }, interval);
   },
 
   /**
    * Main fetch routine - gets all device statuses
    */
-  fetchDevices: async function () {
+  fetchDevices: async function (instance) {
     // Stop immediately if authentication has failed
-    if (this.authFailed) {
+    if (instance.authFailed) {
       return;
     }
 
     // Check if tokens need refresh before making requests
     if (this.oauthData && tokensNeedRefresh(this.oauthData, 600)) {
-      this.log("Tokens need refresh before API calls", true);
-      const refreshed = await this.refreshTokens();
+      this.log("Tokens need refresh before API calls", true, instance);
+      const refreshed = await this.refreshTokens(instance);
       if (!refreshed) {
         return;
       }
@@ -343,12 +364,12 @@ module.exports = NodeHelper.create({
 
     try {
       // Resolve device list if needed
-      if (this.deviceList.length === 0) {
-        await this.resolveDevices();
+      if (instance.deviceList.length === 0) {
+        await this.resolveDevices(instance);
       }
 
-      if (this.deviceList.length === 0) {
-        this.sendSocketNotification("ERROR", {
+      if (instance.deviceList.length === 0) {
+        this.sendToInstance("ERROR", instance, {
           message: "No devices found matching configuration."
         });
         return;
@@ -356,7 +377,7 @@ module.exports = NodeHelper.create({
 
       // Fetch status for each device
       const devices = [];
-      for (const device of this.deviceList) {
+      for (const device of instance.deviceList) {
         // Check rate limit before each request
         if (!this.checkRateLimit()) {
           this.log("Rate limit approached, delaying requests");
@@ -364,34 +385,34 @@ module.exports = NodeHelper.create({
         }
 
         try {
-          const status = await this.fetchDeviceStatus(device.id);
+          const status = await this.fetchDeviceStatus(device.id, instance);
           if (status) {
-            const normalized = this.normalizeDevice(device, status);
+            const normalized = this.normalizeDevice(device, status, instance);
             if (normalized) {
               devices.push(normalized);
             }
           }
         } catch (err) {
           // Individual device errors don't count as full failures
-          this.log("Error fetching device " + device.id + ": " + err.message);
+          this.log("Error fetching device " + device.id + ": " + err.message, false, instance);
         }
       }
 
       // SUCCESS - reset failure counter and clear alerts
-      this.consecutiveFailures = 0;
-      this.clearAlert();
+      instance.consecutiveFailures = 0;
+      this.clearAlert(instance);
 
       // Update cache
-      this.updateCache({ lastStatus: devices });
+      this.updateCache(instance, { lastStatus: devices });
 
       // Send to frontend
-      this.sendSocketNotification("DEVICE_DATA", {
+      this.sendToInstance("DEVICE_DATA", instance, {
         devices: devices,
         timestamp: new Date().toISOString()
       });
 
     } catch (err) {
-      this.handleError(err);
+      this.handleError(err, instance);
     }
   },
 
@@ -402,57 +423,58 @@ module.exports = NodeHelper.create({
    * 1. If explicit devices are configured, use ONLY those devices
    * 2. If only rooms are configured (no explicit devices), use all devices from those rooms
    */
-  resolveDevices: async function () {
-    this.deviceList = [];
+  resolveDevices: async function (instance) {
+    instance.deviceList = [];
 
     // If explicit devices are configured, use ONLY those
-    if (this.config.devices && this.config.devices.length > 0) {
-      this.log("Using " + this.config.devices.length + " explicitly configured devices only", true);
-      this.deviceList = this.config.devices.map(d => ({
+    if (instance.config.devices && instance.config.devices.length > 0) {
+      this.log("Using " + instance.config.devices.length + " explicitly configured devices only", true, instance);
+      instance.deviceList = instance.config.devices.map(d => ({
         id: d.id,
         name: d.name,
         room: d.room || null
       }));
 
       // Cache and return - don't also fetch from rooms
-      this.updateCache({ devices: this.deviceList });
-      this.log("Resolved " + this.deviceList.length + " total devices", true);
+      this.updateCache(instance, { devices: instance.deviceList });
+      this.log("Resolved " + instance.deviceList.length + " total devices", true, instance);
       return;
     }
 
     // No explicit devices - resolve from rooms
-    if (this.config.rooms && this.config.rooms.length > 0) {
-      this.log("Resolving devices from " + this.config.rooms.length + " rooms", true);
+    if (instance.config.rooms && instance.config.rooms.length > 0) {
+      this.log("Resolving devices from " + instance.config.rooms.length + " rooms", true, instance);
 
       // Get location ID
-      if (!this.locationId) {
-        const locations = await this.apiRequest("/locations");
+      if (!instance.locationId) {
+        const locations = await this.apiRequest("/locations", instance);
         if (locations && locations.items && locations.items.length > 0) {
-          this.locationId = locations.items[0].locationId;
-          this.log("Using location: " + this.locationId, true);
+          instance.locationId = locations.items[0].locationId;
+          this.log("Using location: " + instance.locationId, true, instance);
         } else {
           throw new Error("No SmartThings locations found");
         }
       }
 
       // Get rooms
-      const roomsResponse = await this.apiRequest(`/locations/${this.locationId}/rooms`);
+      const roomsResponse = await this.apiRequest(`/locations/${instance.locationId}/rooms`, instance);
       if (roomsResponse && roomsResponse.items) {
         for (const room of roomsResponse.items) {
           // Check if this room is in our config
-          if (this.config.rooms.includes(room.name)) {
-            this.log("Fetching devices from room: " + room.name, true);
+          if (instance.config.rooms.includes(room.name)) {
+            this.log("Fetching devices from room: " + room.name, true, instance);
 
             // Get devices in this room
             const devicesResponse = await this.apiRequest(
-              `/locations/${this.locationId}/rooms/${room.roomId}/devices`
+              `/locations/${instance.locationId}/rooms/${room.roomId}/devices`,
+              instance
             );
 
             if (devicesResponse && devicesResponse.items) {
               for (const device of devicesResponse.items) {
                 // Avoid duplicates
-                if (!this.deviceList.find(d => d.id === device.deviceId)) {
-                  this.deviceList.push({
+                if (!instance.deviceList.find(d => d.id === device.deviceId)) {
+                  instance.deviceList.push({
                     id: device.deviceId,
                     name: device.label || device.name,
                     room: room.name
@@ -465,31 +487,31 @@ module.exports = NodeHelper.create({
       }
     }
 
-    this.log("Resolved " + this.deviceList.length + " total devices", true);
+    this.log("Resolved " + instance.deviceList.length + " total devices", true, instance);
 
     // Cache the device list
-    this.updateCache({ devices: this.deviceList });
+    this.updateCache(instance, { devices: instance.deviceList });
   },
 
   /**
    * Fetch status for a single device
    */
-  fetchDeviceStatus: async function (deviceId) {
-    return await this.apiRequest(`/devices/${deviceId}/status`);
+  fetchDeviceStatus: async function (deviceId, instance) {
+    return await this.apiRequest(`/devices/${deviceId}/status`, instance);
   },
 
   /**
    * Make an API request with rate limiting and error handling
    */
-  apiRequest: async function (endpoint) {
+  apiRequest: async function (endpoint, instance) {
     // Apply backoff if needed
     if (this.backoffDelay > 0) {
-      this.log("Applying backoff delay: " + this.backoffDelay + "ms", true);
+      this.log("Applying backoff delay: " + this.backoffDelay + "ms", true, instance);
       await this.delay(this.backoffDelay);
     }
 
     // Get access token
-    const accessToken = this.getAccessToken();
+    const accessToken = this.getAccessToken(instance);
     if (!accessToken) {
       throw new Error("No access token available");
     }
@@ -501,7 +523,7 @@ module.exports = NodeHelper.create({
     }
 
     const url = this.API_BASE + endpoint;
-    this.log("API Request: " + endpoint, true);
+    this.log("API Request: " + endpoint, true, instance);
 
     const response = await fetch(url, {
       method: "GET",
@@ -513,7 +535,7 @@ module.exports = NodeHelper.create({
 
     // Handle response status
     if (!response.ok) {
-      await this.handleHttpError(response);
+      await this.handleHttpError(response, instance);
       return null;
     }
 
@@ -526,7 +548,7 @@ module.exports = NodeHelper.create({
   /**
    * Handle HTTP error responses
    */
-  handleHttpError: async function (response) {
+  handleHttpError: async function (response, instance) {
     const status = response.status;
     let errorBody = "";
     
@@ -540,17 +562,17 @@ module.exports = NodeHelper.create({
       case 400:
         // Check for invalid_grant in body
         if (errorBody.includes("invalid_grant")) {
-          this.recordFailure("auth", "ALERT_AUTH");
+          this.recordFailure(instance, "auth", "ALERT_AUTH");
           throw new Error("Invalid grant");
         }
-        this.recordFailure("outage", "ALERT_OUTAGE");
+        this.recordFailure(instance, "outage", "ALERT_OUTAGE");
         throw new Error("Bad request: " + status);
 
       case 401:
         // Auth failure - try to refresh tokens first (OAuth mode)
-        if (this.oauthData && !this.authFailed) {
+        if (this.oauthData && !instance.authFailed) {
           console.warn("[MMM-STStatus] Auth error (HTTP " + status + "), attempting token refresh...");
-          const refreshed = await this.refreshTokens();
+          const refreshed = await this.refreshTokens(instance);
           if (refreshed) {
             // Don't throw, let the caller retry
             throw new Error("Token refreshed, retry request");
@@ -559,30 +581,30 @@ module.exports = NodeHelper.create({
 
         // Check for invalid_grant in body
         if (errorBody.includes("invalid_grant")) {
-          this.recordFailure("auth", "ALERT_AUTH");
+          this.recordFailure(instance, "auth", "ALERT_AUTH");
         } else {
-          this.recordFailure("auth", "ALERT_AUTH");
+          this.recordFailure(instance, "auth", "ALERT_AUTH");
         }
 
         // Auth failure - stop polling
         console.error("[MMM-STStatus] ERROR: Authentication failed (HTTP " + status + ")");
-        this.authFailed = true;
-        if (this.pollTimer) {
-          clearInterval(this.pollTimer);
-          this.pollTimer = null;
+        instance.authFailed = true;
+        if (instance.pollTimer) {
+          clearInterval(instance.pollTimer);
+          instance.pollTimer = null;
         }
         throw new Error("Authentication failed");
 
       case 403:
         // Permission/scope error
-        this.recordFailure("scope", "ALERT_SCOPE");
+        this.recordFailure(instance, "scope", "ALERT_SCOPE");
         console.error("[MMM-STStatus] ERROR: Permission denied (HTTP " + status + ")");
         throw new Error("Permission denied");
 
       case 429:
         // Rate limited - exponential backoff
         this.backoffDelay = Math.min(this.backoffDelay ? this.backoffDelay * 2 : 1000, 30000);
-        this.recordFailure("rateLimit", "ALERT_RATE_LIMIT");
+        this.recordFailure(instance, "rateLimit", "ALERT_RATE_LIMIT");
         console.warn("[MMM-STStatus] WARNING: Rate limited, backing off for " + this.backoffDelay + "ms");
         throw new Error("Rate limited");
 
@@ -590,12 +612,12 @@ module.exports = NodeHelper.create({
       case 502:
       case 503:
         // Server error - log and continue
-        this.recordFailure("outage", "ALERT_OUTAGE");
+        this.recordFailure(instance, "outage", "ALERT_OUTAGE");
         console.warn("[MMM-STStatus] WARNING: Server error (HTTP " + status + "), will retry");
         throw new Error("Server error: " + status);
 
       default:
-        this.recordFailure("outage", "ALERT_OUTAGE");
+        this.recordFailure(instance, "outage", "ALERT_OUTAGE");
         console.error("[MMM-STStatus] ERROR: HTTP " + status);
         throw new Error("HTTP error: " + status);
     }
@@ -604,7 +626,7 @@ module.exports = NodeHelper.create({
   /**
    * Handle general errors
    */
-  handleError: function (err) {
+  handleError: function (err, instance) {
     const message = err.message || "Unknown error";
     const code = err.code || "";
     
@@ -612,14 +634,14 @@ module.exports = NodeHelper.create({
 
     // Check for network errors
     if (code === "ECONNREFUSED" || code === "ETIMEDOUT" || code === "ENOTFOUND" || code === "ECONNRESET") {
-      this.recordFailure("network", "ALERT_NETWORK");
+      this.recordFailure(instance, "network", "ALERT_NETWORK");
       console.warn("[MMM-STStatus] Network error, using cached data if available");
       return;
     }
 
     // Check for network errors surfaced through the error message
     if (message.match(/ENOTFOUND|ETIMEDOUT|ECONNRESET|ECONNREFUSED|network/i)) {
-      this.recordFailure("network", "ALERT_NETWORK");
+      this.recordFailure(instance, "network", "ALERT_NETWORK");
       console.warn("[MMM-STStatus] Network error detected in message");
       return;
     }
@@ -640,18 +662,18 @@ module.exports = NodeHelper.create({
     }
 
     // Generic/unknown errors
-    this.recordFailure("outage", "ALERT_OUTAGE");
+    this.recordFailure(instance, "outage", "ALERT_OUTAGE");
   },
 
   /**
    * Normalize device data for frontend
    * @returns {Object|null} Normalized device or null if parsing failed
    */
-  normalizeDevice: function (device, status) {
+  normalizeDevice: function (device, status, instance) {
     // Check for unexpected response shape
     if (!status || typeof status !== "object") {
-      this.log("Schema error: status is not an object for device " + device.name, true);
-      this.recordSchemaError();
+      this.log("Schema error: status is not an object for device " + device.name, true, instance);
+      this.recordSchemaError(instance);
       return null;
     }
 
@@ -668,8 +690,8 @@ module.exports = NodeHelper.create({
       const main = status.components.main;
 
       // Debug: log all capabilities for this device
-      if (this.config.debug) {
-        this.log("Device " + device.name + " capabilities: " + Object.keys(main).join(", "));
+      if (instance.config.debug) {
+        this.log("Device " + device.name + " capabilities: " + Object.keys(main).join(", "), false, instance);
       }
 
       // Priority order for primary capability
@@ -684,8 +706,8 @@ module.exports = NodeHelper.create({
             // Lock state is at main.lock.lock.value
             if (main.lock && main.lock.lock && main.lock.lock.value !== undefined) {
               normalized.primaryState = main.lock.lock.value;
-              if (this.config.debug) {
-                this.log("Device " + device.name + " lock state: " + normalized.primaryState);
+              if (instance.config.debug) {
+                this.log("Device " + device.name + " lock state: " + normalized.primaryState, false, instance);
               }
             } else {
               // Fallback to generic extraction
@@ -715,8 +737,8 @@ module.exports = NodeHelper.create({
             
             // Store the numeric level as primaryState for blinds
             normalized.primaryState = shadeLevel;
-            if (this.config.debug) {
-              this.log("Device " + device.name + " blinds level: " + shadeLevel);
+            if (instance.config.debug) {
+              this.log("Device " + device.name + " blinds level: " + shadeLevel, false, instance);
             }
           } else {
             normalized.primaryState = this.extractState(main[cap]);
@@ -737,8 +759,8 @@ module.exports = NodeHelper.create({
           // Try different attribute structures
           if (main[tempCap].temperature && main[tempCap].temperature.value !== undefined) {
             normalized.temperature = main[tempCap].temperature.value;
-            if (this.config.debug) {
-              this.log("Device " + device.name + " temperature: " + normalized.temperature);
+            if (instance.config.debug) {
+              this.log("Device " + device.name + " temperature: " + normalized.temperature, false, instance);
             }
             break;
           }
@@ -746,8 +768,8 @@ module.exports = NodeHelper.create({
           const tempValue = this.extractState(main[tempCap]);
           if (tempValue !== null && typeof tempValue === "number") {
             normalized.temperature = tempValue;
-            if (this.config.debug) {
-              this.log("Device " + device.name + " temperature (alt): " + normalized.temperature);
+            if (instance.config.debug) {
+              this.log("Device " + device.name + " temperature (alt): " + normalized.temperature, false, instance);
             }
             break;
           }
@@ -802,11 +824,11 @@ module.exports = NodeHelper.create({
           normalized.temperature =
             component.temperatureMeasurement.temperature.value;
 
-          if (this.config.debug) {
+          if (instance.config.debug) {
             this.log(
               "Temperature from component '" + componentName +
               "': " + normalized.temperature
-            );
+            , false, instance);
           }
           break;
         }
@@ -817,11 +839,11 @@ module.exports = NodeHelper.create({
 
           normalized.temperature = component.temperature.value;
 
-          if (this.config.debug) {
+          if (instance.config.debug) {
             this.log(
               "Temperature (alt) from component '" + componentName +
               "': " + normalized.temperature
-            );
+            , false, instance);
           }
           break;
         }
@@ -890,8 +912,8 @@ module.exports = NodeHelper.create({
             main.thermostatOperatingState.operatingState.value;
         }
         
-        if (this.config.debug && normalized.capabilities.thermostatOperatingState) {
-          this.log("Thermostat operating state: " + normalized.capabilities.thermostatOperatingState);
+        if (instance.config.debug && normalized.capabilities.thermostatOperatingState) {
+          this.log("Thermostat operating state: " + normalized.capabilities.thermostatOperatingState, false, instance);
         }
       }
 
@@ -907,8 +929,8 @@ module.exports = NodeHelper.create({
 
       // Thermostat heating setpoint
       if (main.thermostatHeatingSetpoint) {
-        if (this.config.debug) {
-          this.log("thermostatHeatingSetpoint object: " + JSON.stringify(main.thermostatHeatingSetpoint));
+        if (instance.config.debug) {
+          this.log("thermostatHeatingSetpoint object: " + JSON.stringify(main.thermostatHeatingSetpoint), false, instance);
         }
         if (
           main.thermostatHeatingSetpoint.heatingSetpoint &&
@@ -918,16 +940,16 @@ module.exports = NodeHelper.create({
             main.thermostatHeatingSetpoint.heatingSetpoint.value;
           normalized.capabilities.heatingSetpoint =
             main.thermostatHeatingSetpoint.heatingSetpoint.value;
-          if (this.config.debug) {
-            this.log("Heating setpoint: " + normalized.heatingSetpoint);
+          if (instance.config.debug) {
+            this.log("Heating setpoint: " + normalized.heatingSetpoint, false, instance);
           }
         }
       }
 
       // Thermostat cooling setpoint
       if (main.thermostatCoolingSetpoint) {
-        if (this.config.debug) {
-          this.log("thermostatCoolingSetpoint object: " + JSON.stringify(main.thermostatCoolingSetpoint));
+        if (instance.config.debug) {
+          this.log("thermostatCoolingSetpoint object: " + JSON.stringify(main.thermostatCoolingSetpoint), false, instance);
         }
         if (
           main.thermostatCoolingSetpoint.coolingSetpoint &&
@@ -937,8 +959,8 @@ module.exports = NodeHelper.create({
             main.thermostatCoolingSetpoint.coolingSetpoint.value;
           normalized.capabilities.coolingSetpoint =
             main.thermostatCoolingSetpoint.coolingSetpoint.value;
-          if (this.config.debug) {
-            this.log("Cooling setpoint: " + normalized.coolingSetpoint);
+          if (instance.config.debug) {
+            this.log("Cooling setpoint: " + normalized.coolingSetpoint, false, instance);
           }
         }
       }
@@ -998,55 +1020,55 @@ module.exports = NodeHelper.create({
   /**
    * Cache management
    */
-  loadCache: function () {
+  loadCache: function (instance) {
     try {
-      if (fs.existsSync(this.cacheFile)) {
-        const data = fs.readFileSync(this.cacheFile, "utf8");
-        this.cache = JSON.parse(data);
+      if (fs.existsSync(instance.cacheFile)) {
+        const data = fs.readFileSync(instance.cacheFile, "utf8");
+        instance.cache = JSON.parse(data);
 
         // Check TTL
-        const cacheAge = Date.now() - new Date(this.cache.timestamp).getTime();
+        const cacheAge = Date.now() - new Date(instance.cache.timestamp).getTime();
         if (cacheAge > this.CACHE_TTL) {
-          this.log("Cache expired, clearing", true);
-          this.cache = null;
+          this.log("Cache expired, clearing", true, instance);
+          instance.cache = null;
         } else {
-          this.log("Cache loaded, age: " + Math.round(cacheAge / 1000 / 60) + " minutes", true);
+          this.log("Cache loaded, age: " + Math.round(cacheAge / 1000 / 60) + " minutes", true, instance);
 
           // Restore device list from cache
-          if (this.cache.devices) {
-            this.deviceList = this.cache.devices;
+          if (instance.cache.devices) {
+            instance.deviceList = instance.cache.devices;
           }
-          if (this.cache.locationId) {
-            this.locationId = this.cache.locationId;
+          if (instance.cache.locationId) {
+            instance.locationId = instance.cache.locationId;
           }
         }
       }
     } catch (err) {
-      this.log("Error loading cache: " + err.message);
-      this.cache = null;
+      this.log("Error loading cache: " + err.message, false, instance);
+      instance.cache = null;
     }
   },
 
-  updateCache: function (updates) {
-    if (!this.cache) {
-      this.cache = {
+  updateCache: function (instance, updates) {
+    if (!instance.cache) {
+      instance.cache = {
         timestamp: new Date().toISOString(),
-        configHash: this.hashConfig(this.config)
+        configHash: this.hashConfig(instance.config)
       };
     }
 
     // Apply updates
-    Object.assign(this.cache, updates, {
+    Object.assign(instance.cache, updates, {
       timestamp: new Date().toISOString(),
-      locationId: this.locationId
+      locationId: instance.locationId
     });
 
     // Write to disk
     try {
-      fs.writeFileSync(this.cacheFile, JSON.stringify(this.cache, null, 2));
-      this.log("Cache updated", true);
+      fs.writeFileSync(instance.cacheFile, JSON.stringify(instance.cache, null, 2));
+      this.log("Cache updated", true, instance);
     } catch (err) {
-      this.log("Error writing cache: " + err.message);
+      this.log("Error writing cache: " + err.message, false, instance);
     }
   },
 
@@ -1069,19 +1091,19 @@ module.exports = NodeHelper.create({
    * @param {string} type - Alert type: auth, scope, network, rateLimit, outage, schema
    * @param {string} messageKey - Translation key for the alert message
    */
-  recordFailure: function (type, messageKey) {
-    this.consecutiveFailures++;
-    this.log("Failure recorded: " + type + " (count: " + this.consecutiveFailures + ")", true);
+  recordFailure: function (instance, type, messageKey) {
+    instance.consecutiveFailures++;
+    this.log("Failure recorded: " + type + " (count: " + instance.consecutiveFailures + ")", true, instance);
 
     // Auth and scope errors are critical - alert immediately
     if (type === "auth" || type === "scope") {
-      this.setAlert(type, messageKey);
+      this.setAlert(instance, type, messageKey);
       return;
     }
 
     // Other errors wait for threshold
-    if (this.consecutiveFailures >= this.FAILURE_THRESHOLD) {
-      this.setAlert(type, messageKey);
+    if (instance.consecutiveFailures >= this.FAILURE_THRESHOLD) {
+      this.setAlert(instance, type, messageKey);
     }
   },
 
@@ -1090,24 +1112,24 @@ module.exports = NodeHelper.create({
    * @param {string} type - Alert type
    * @param {string} messageKey - Translation key for the alert message
    */
-  setAlert: function (type, messageKey) {
+  setAlert: function (instance, type, messageKey) {
     // Check if new alert has higher priority than current
-    if (this.currentAlert) {
-      const currentPriority = this.ALERT_PRIORITY.indexOf(this.currentAlert.type);
+    if (instance.currentAlert) {
+      const currentPriority = this.ALERT_PRIORITY.indexOf(instance.currentAlert.type);
       const newPriority = this.ALERT_PRIORITY.indexOf(type);
       
       // Lower index = higher priority
       if (newPriority >= currentPriority && currentPriority !== -1) {
-        this.log("Alert " + type + " ignored, current alert " + this.currentAlert.type + " has higher priority", true);
+        this.log("Alert " + type + " ignored, current alert " + instance.currentAlert.type + " has higher priority", true, instance);
         return;
       }
     }
 
-    this.currentAlert = { type: type, messageKey: messageKey };
-    this.log("Alert set: " + type, true);
+    instance.currentAlert = { type: type, messageKey: messageKey };
+    this.log("Alert set: " + type, true, instance);
 
     // Send alert to frontend
-    this.sendSocketNotification("ALERT", {
+    this.sendToInstance("ALERT", instance, {
       type: type,
       messageKey: messageKey
     });
@@ -1116,11 +1138,11 @@ module.exports = NodeHelper.create({
   /**
    * Clear the current alert
    */
-  clearAlert: function () {
-    if (this.currentAlert) {
-      this.log("Alert cleared: " + this.currentAlert.type, true);
-      this.currentAlert = null;
-      this.sendSocketNotification("ALERT_CLEAR", {});
+  clearAlert: function (instance) {
+    if (instance.currentAlert) {
+      this.log("Alert cleared: " + instance.currentAlert.type, true, instance);
+      instance.currentAlert = null;
+      this.sendToInstance("ALERT_CLEAR", instance, {});
     }
   },
 
@@ -1128,14 +1150,14 @@ module.exports = NodeHelper.create({
    * Record a schema/parsing error
    * Called when API returns 200 but data cannot be parsed as expected
    */
-  recordSchemaError: function () {
-    this.recordFailure("schema", "ALERT_SCHEMA");
+  recordSchemaError: function (instance) {
+    this.recordFailure(instance, "schema", "ALERT_SCHEMA");
   },
 
   /**
    * Mock data for test mode
    */
-  sendMockData: function () {
+  sendMockData: function (instance) {
     const mockDevices = [
       { id: "1", name: "Living Room Lamp", room: "Living Room", primaryCapability: "switch", primaryState: "on" },
       { id: "2", name: "Front Door", room: "Entry", primaryCapability: "contact", primaryState: "closed" },
@@ -1150,25 +1172,25 @@ module.exports = NodeHelper.create({
     ];
 
     // Clear any existing poller
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
+    if (instance.pollTimer) {
+      clearInterval(instance.pollTimer);
+      instance.pollTimer = null;
     }
 
     // Send initial mock data immediately
-    this.sendSocketNotification("DEVICE_DATA", {
+    this.sendToInstance("DEVICE_DATA", instance, {
       devices: mockDevices,
       timestamp: new Date().toISOString()
     });
 
     // Reuse pollTimer for mock polling
-    const interval = this.config.pollInterval || 60000;
-    this.pollTimer = setInterval(() => {
+    const interval = instance.config.pollInterval || 60000;
+    instance.pollTimer = setInterval(() => {
       // Toggle one device to simulate activity
       mockDevices[4].primaryState =
         mockDevices[4].primaryState === "active" ? "inactive" : "active";
 
-      this.sendSocketNotification("DEVICE_DATA", {
+      this.sendToInstance("DEVICE_DATA", instance, {
         devices: mockDevices,
         timestamp: new Date().toISOString()
       });
@@ -1182,8 +1204,9 @@ module.exports = NodeHelper.create({
     return new Promise(resolve => setTimeout(resolve, ms));
   },
 
-  log: function (message, debugOnly) {
-    if (debugOnly && !this.config.debug) return;
-    console.log("[MMM-STStatus] " + message);
+  log: function (message, debugOnly, instance) {
+    if (debugOnly && instance && instance.config && !instance.config.debug) return;
+    const prefix = instance ? `[MMM-STStatus:${instance.id}]` : "[MMM-STStatus]";
+    console.log(prefix + " " + message);
   }
 });

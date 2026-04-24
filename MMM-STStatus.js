@@ -103,8 +103,12 @@ Module.register("MMM-STStatus", {
       return;
     }
 
-    // Send config to backend
-    this.sendSocketNotification("SET_CONFIG", this.config);
+    // Send config to backend with this instance identifier so the helper can
+    // keep per-instance state when multiple MagicMirror configs load the module.
+    this.sendSocketNotification("SET_CONFIG", {
+      ...this.config,
+      identifier: this.identifier
+    });
   },
 
   /**
@@ -136,6 +140,10 @@ Module.register("MMM-STStatus", {
   socketNotificationReceived: function (notification, payload) {
     if (this.config.debug) {
       Log.info("[MMM-STStatus] Received: " + notification);
+    }
+
+    if (payload && payload.identifier && payload.identifier !== this.identifier) {
+      return;
     }
 
     switch (notification) {
