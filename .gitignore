@@ -3,6 +3,7 @@ node_modules/
 
 # Cache files
 .cache.json
+.cache-*.json
 
 # OAuth data (user-specific, do not commit)
 oauth-tokens.enc
