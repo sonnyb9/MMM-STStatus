@@ -171,6 +171,15 @@ If another frontend module needs SmartThings sensor data, you can let `MMM-STSta
 
 That pattern is useful when a sensor should feed another module, such as `MMM-PoolTemp`, without also adding another visible row to the SmartThings status table.
 
+The rebroadcast payload preserves normalized temperature metadata when SmartThings provides it, including:
+
+- `device.temperature`
+- `device.temperatureUpdatedAt`
+- `device.capabilities.temperature`
+- `device.capabilities.temperatureUpdatedAt`
+
+That gives downstream modules a stable way to distinguish a fresh reading from a stale cached one.
+
 ## SmartThings Test Script
 
 Use the included connectivity check when you want to verify OAuth credentials, confirm device discovery, or inspect normalized SmartThings status data without launching MagicMirror.

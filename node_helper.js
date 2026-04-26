@@ -756,15 +756,17 @@ module.exports = NodeHelper.create({
       const tempCaps = ["temperatureMeasurement", "temperature"];
       for (const tempCap of tempCaps) {
         if (main[tempCap]) {
-          // Try different attribute structures
-          if (main[tempCap].temperature && main[tempCap].temperature.value !== undefined) {
-            normalized.temperature = main[tempCap].temperature.value;
+          const tempAttribute = this.extractCapabilityAttribute(main[tempCap], ["temperature", "value"]);
+
+          if (tempAttribute && tempAttribute.value !== undefined) {
+            normalized.temperature = tempAttribute.value;
+            normalized.temperatureUpdatedAt = this.extractAttributeTimestamp(tempAttribute);
             if (instance.config.debug) {
               this.log("Device " + device.name + " temperature: " + normalized.temperature, false, instance);
             }
             break;
           }
-          // Some devices use a direct value structure
+
           const tempValue = this.extractState(main[tempCap]);
           if (tempValue !== null && typeof tempValue === "number") {
             normalized.temperature = tempValue;
@@ -817,12 +819,17 @@ module.exports = NodeHelper.create({
         const component = status.components[componentName];
 
         // temperatureMeasurement capability
-        if (component.temperatureMeasurement &&
-          component.temperatureMeasurement.temperature &&
-          component.temperatureMeasurement.temperature.value !== undefined) {
+        const componentTemperatureAttribute =
+          (component.temperatureMeasurement &&
+            this.extractCapabilityAttribute(component.temperatureMeasurement, ["temperature"])) ||
+          this.extractCapabilityAttribute(component.temperature, ["temperature", "value"]);
 
-          normalized.temperature =
-            component.temperatureMeasurement.temperature.value;
+        if (componentTemperatureAttribute &&
+          componentTemperatureAttribute.value !== undefined) {
+
+          normalized.temperature = componentTemperatureAttribute.value;
+          normalized.temperatureUpdatedAt =
+            this.extractAttributeTimestamp(componentTemperatureAttribute) || normalized.temperatureUpdatedAt || null;
 
           if (instance.config.debug) {
             this.log(
@@ -833,20 +840,6 @@ module.exports = NodeHelper.create({
           break;
         }
 
-        // Some devices expose temperature under 'temperature'
-        if (component.temperature &&
-          component.temperature.value !== undefined) {
-
-          normalized.temperature = component.temperature.value;
-
-          if (instance.config.debug) {
-            this.log(
-              "Temperature (alt) from component '" + componentName +
-              "': " + normalized.temperature
-            , false, instance);
-          }
-          break;
-        }
       }
     }
     // Ensure thermostat temperature is preserved (Ecobee)
@@ -858,13 +851,17 @@ module.exports = NodeHelper.create({
     ) {
       const main = status.components.main;
 
-      if (
+      const thermostatTempAttribute =
         main.thermostatTemperature &&
-        main.thermostatTemperature.temperature &&
-        main.thermostatTemperature.temperature.value !== undefined
+        this.extractCapabilityAttribute(main.thermostatTemperature, ["temperature"]);
+
+      if (
+        thermostatTempAttribute &&
+        thermostatTempAttribute.value !== undefined
       ) {
-        normalized.temperature =
-          main.thermostatTemperature.temperature.value;
+        normalized.temperature = thermostatTempAttribute.value;
+        normalized.temperatureUpdatedAt =
+          this.extractAttributeTimestamp(thermostatTempAttribute) || normalized.temperatureUpdatedAt || null;
       }
     }
     // --- Normalize SmartThings capabilities for extensibility ---
@@ -874,13 +871,21 @@ module.exports = NodeHelper.create({
       const main = status.components.main;
 
       // Temperature
+      const mainTemperatureAttribute =
+        (main.temperatureMeasurement &&
+          this.extractCapabilityAttribute(main.temperatureMeasurement, ["temperature"])) ||
+        (main.temperature &&
+          this.extractCapabilityAttribute(main.temperature, ["temperature", "value"])) ||
+        (main.thermostatTemperature &&
+          this.extractCapabilityAttribute(main.thermostatTemperature, ["temperature"]));
+
       if (
-        main.temperatureMeasurement &&
-        main.temperatureMeasurement.temperature &&
-        main.temperatureMeasurement.temperature.value !== undefined
+        mainTemperatureAttribute &&
+        mainTemperatureAttribute.value !== undefined
       ) {
-        normalized.capabilities.temperature =
-          main.temperatureMeasurement.temperature.value;
+        normalized.capabilities.temperature = mainTemperatureAttribute.value;
+        normalized.capabilities.temperatureUpdatedAt =
+          this.extractAttributeTimestamp(mainTemperatureAttribute);
       }
 
       // Humidity
@@ -966,6 +971,36 @@ module.exports = NodeHelper.create({
       }
     }
     return normalized;
+  },
+
+  extractCapabilityAttribute: function (capabilityData, preferredAttributes = []) {
+    if (!capabilityData || typeof capabilityData !== "object") {
+      return null;
+    }
+
+    for (const attributeName of preferredAttributes) {
+      const attribute = capabilityData[attributeName];
+      if (attribute && attribute.value !== undefined) {
+        return attribute;
+      }
+    }
+
+    for (const attributeName of Object.keys(capabilityData)) {
+      const attribute = capabilityData[attributeName];
+      if (attribute && attribute.value !== undefined) {
+        return attribute;
+      }
+    }
+
+    return null;
+  },
+
+  extractAttributeTimestamp: function (attribute) {
+    if (!attribute || typeof attribute !== "object") {
+      return null;
+    }
+
+    return attribute.timestamp || attribute.lastUpdated || attribute.updatedAt || null;
   },
 
   /**
