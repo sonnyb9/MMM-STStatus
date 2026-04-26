@@ -13,8 +13,11 @@ Module.register("MMM-STStatus", {
   defaults: {
     token: "",                    // Legacy: SmartThings Personal Access Token (deprecated)
     devices: [],                  // Explicit device list: [{ id: "xxx", name: "Name" }]
+    hiddenDevices: [],            // Device IDs to hide from display while still fetching/broadcasting
     rooms: [],                    // Room names to include: ["Living Room", "Kitchen"]
     pollInterval: 60000,          // Polling interval in ms (default: 60 seconds)
+    broadcastDeviceData: false,   // Broadcast normalized device data for other modules
+    broadcastNotification: "STSTATUS_DEVICE_DATA",
     showLastUpdated: true,        // Show last updated timestamp
     showDeviceType: true,         // Show device type column
     fontSize: 100,                // Font size as percentage (100 = default)
@@ -152,6 +155,12 @@ Module.register("MMM-STStatus", {
         this.error = null;
         this.deviceData = this.filterDevices(payload.devices || []);
         this.lastUpdate = payload.timestamp || new Date().toISOString();
+        if (this.config.broadcastDeviceData && this.config.broadcastNotification) {
+          this.sendNotification(this.config.broadcastNotification, {
+            devices: payload.devices || [],
+            timestamp: this.lastUpdate
+          });
+        }
         this.updateDom();
         break;
 
@@ -557,15 +566,21 @@ Module.register("MMM-STStatus", {
    * Filter devices based on config.devices array (frontend filtering for multi-instance support)
    */
   filterDevices: function (devices) {
+    const hiddenIds = new Set(Array.isArray(this.config.hiddenDevices) ? this.config.hiddenDevices : []);
+
+    const visibleDevices = devices.filter(function (device) {
+      return !hiddenIds.has(device.id);
+    });
+
     if (!this.config.devices || this.config.devices.length === 0) {
-      return devices;
+      return visibleDevices;
     }
 
     const configDeviceIds = this.config.devices.map(function (d) {
       return d.id;
     });
 
-    return devices.filter(function (device) {
+    return visibleDevices.filter(function (device) {
       return configDeviceIds.indexOf(device.id) !== -1;
     });
   },

@@ -108,7 +108,10 @@ Example output from setup wizard:
       { id: "device-uuid-1", name: "Front Door" },
       { id: "device-uuid-2", name: "Living Room Lamp" }
     ],
+    hiddenDevices: [],
     pollInterval: 60000,
+    broadcastDeviceData: false,
+    broadcastNotification: "STSTATUS_DEVICE_DATA",
     showLastUpdated: true,
     temperatureUnit: "F",
     defaultSort: "name",
@@ -131,8 +134,11 @@ pm2 restart MagicMirror
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `devices` | Array | `[]` | Explicit list of devices: `[{ id: "uuid", name: "Display Name" }]` |
+| `hiddenDevices` | Array | `[]` | Device IDs to fetch and broadcast but omit from the visible table |
 | `rooms` | Array | `[]` | List of room names to include (e.g., `["Living Room"]`) |
 | `pollInterval` | Number | `60000` | How often to fetch updates (ms, minimum 30000) |
+| `broadcastDeviceData` | Boolean | `false` | Re-broadcast normalized device payloads to other frontend modules |
+| `broadcastNotification` | String | `"STSTATUS_DEVICE_DATA"` | Notification name used when `broadcastDeviceData` is enabled |
 | `showLastUpdated` | Boolean | `true` | Show clock time of last successful API update (e.g., "Last Update: 10:30:45 AM") |
 | `showDeviceType` | Boolean | `true` | Show device type column (e.g., "Lock", "Door Sensor") |
 | `fontSize` | Number | `100` | Font size as percentage (e.g., 80 for smaller, 120 for larger) |
@@ -143,6 +149,27 @@ pm2 restart MagicMirror
 | `token` | String | `""` | *Legacy:* Personal Access Token (deprecated, use setup.js instead) |
 
 **Note**: Use either `devices` (explicit list) or `rooms` (fetch all devices from rooms), not both.
+
+### Using MMM-STStatus as a data bridge
+
+If another frontend module needs SmartThings sensor data, you can let `MMM-STStatus` fetch the devices once and rebroadcast the normalized payload:
+
+```js
+{
+  module: "MMM-STStatus",
+  position: "middle_center",
+  config: {
+    devices: [
+      { id: "pool-sensor-uuid", name: "Pool Sensor" }
+    ],
+    hiddenDevices: ["pool-sensor-uuid"],
+    broadcastDeviceData: true,
+    broadcastNotification: "STSTATUS_DEVICE_DATA"
+  }
+}
+```
+
+That pattern is useful when a sensor should feed another module, such as `MMM-PoolTemp`, without also adding another visible row to the SmartThings status table.
 
 ## SmartThings Test Script
 
