@@ -424,11 +424,11 @@ async function promptForPosition() {
   });
   
   console.log("");
-  const choice = await prompt("Enter position number or name (default: top_right): ");
+  const choice = await prompt("Enter position number or name (default: middle_center): ");
   
   if (!choice.trim()) {
-    console.log("   Using default: top_right");
-    return "top_right";
+    console.log("   Using default: middle_center");
+    return "middle_center";
   }
   
   // Check if it's a number
@@ -442,8 +442,8 @@ async function promptForPosition() {
     return choice.trim();
   }
   
-  console.log("⚠️  Invalid position, using 'top_right' as default");
-  return "top_right";
+  console.log("⚠️  Invalid position, using 'middle_center' as default");
+  return "middle_center";
 }
 
 /**
