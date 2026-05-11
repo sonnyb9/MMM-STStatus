@@ -12,7 +12,7 @@ oauth-key.bin
 
 # Project development docs (personal notes)
 Project Docs/
-AI-CONTEXT.md
+AI_CONTEXT.md
 
 # Local backup files
 node_helper.js.backup*
