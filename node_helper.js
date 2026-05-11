@@ -52,6 +52,7 @@ module.exports = NodeHelper.create({
       this.instances[instanceId] = {
         id: instanceId,
         config: null,
+        lastConfigHash: null,
         pollTimer: null,
         locationId: null,
         deviceList: [],
@@ -92,8 +93,17 @@ module.exports = NodeHelper.create({
     // Load cache
     this.loadCache(instance);
 
-    // Check if config changed (invalidate cache)
+    // Check if config changed and clear any resolved device state from a
+    // previous frontend session so a stale client cannot keep old device IDs
+    // alive after a later reconnect with newer config.
     const configHash = this.hashConfig(instance.config);
+    if (instance.lastConfigHash && instance.lastConfigHash !== configHash) {
+      this.log("Config changed, resetting resolved device list", true, instance);
+      instance.deviceList = [];
+      instance.locationId = null;
+    }
+    instance.lastConfigHash = configHash;
+
     if (instance.cache && instance.cache.configHash !== configHash) {
       this.log("Config changed, invalidating cache", true, instance);
       instance.cache = null;
