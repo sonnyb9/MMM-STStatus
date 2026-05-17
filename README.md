@@ -196,6 +196,10 @@ What it does:
 - Falls back to all SmartThings devices if no explicit device list is configured
 - Updates `.cache.json` with the latest successful device status payloads
 
+Multi-instance note:
+- If two MagicMirror processes share the same `MMM-STStatus` directory and OAuth files, the helper now reloads token state from disk before refreshes and retries one failed API call after a successful refresh.
+- This makes shared-token setups much more reliable, but separate OAuth apps/files per instance are still the most isolated option if SmartThings rotates refresh tokens aggressively.
+
 Optional flags:
 
 ```bash

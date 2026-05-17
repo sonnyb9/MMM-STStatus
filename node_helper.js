@@ -28,6 +28,7 @@ module.exports = NodeHelper.create({
   requestCount: 0,
   requestResetTime: null,
   tokenRefreshTimer: null,
+  oauthRefreshPromise: null,
   backoffDelay: 0,
   FAILURE_THRESHOLD: 10,
   ALERT_PRIORITY: ["auth", "scope", "network", "rateLimit", "outage", "schema"],
@@ -171,7 +172,7 @@ module.exports = NodeHelper.create({
     this.log("Initializing OAuth authentication", true, instance);
 
     // Load OAuth data from encrypted file
-    this.oauthData = loadOAuthData(__dirname);
+    this.oauthData = this.loadOAuthDataFromDisk(instance);
 
     if (!this.oauthData) {
       console.error("[MMM-STStatus] ERROR: Failed to load OAuth data. Please run setup.js");
@@ -238,89 +239,210 @@ module.exports = NodeHelper.create({
     }
   },
 
+  loadOAuthDataFromDisk: function (instance) {
+    const diskData = loadOAuthData(__dirname);
+
+    if (!diskData) {
+      return null;
+    }
+
+    if (!this.oauthData) {
+      return diskData;
+    }
+
+    if (this.isOAuthDataNewer(diskData, this.oauthData)) {
+      this.log("Detected newer OAuth token state on disk", true, instance);
+      return diskData;
+    }
+
+    return this.oauthData;
+  },
+
+  getOAuthTimestamp: function (oauthData) {
+    if (!oauthData) {
+      return 0;
+    }
+
+    const candidates = [oauthData.obtainedAt, oauthData.expiresAt];
+    for (const value of candidates) {
+      const timestamp = Date.parse(value);
+      if (!Number.isNaN(timestamp)) {
+        return timestamp;
+      }
+    }
+
+    return 0;
+  },
+
+  isOAuthDataNewer: function (candidate, current) {
+    if (!candidate) {
+      return false;
+    }
+
+    if (!current) {
+      return true;
+    }
+
+    const candidateTs = this.getOAuthTimestamp(candidate);
+    const currentTs = this.getOAuthTimestamp(current);
+
+    if (candidateTs !== currentTs) {
+      return candidateTs > currentTs;
+    }
+
+    return (
+      candidate.access_token !== current.access_token ||
+      candidate.refresh_token !== current.refresh_token
+    );
+  },
+
+  syncOAuthDataFromDisk: function (instance, options = {}) {
+    if (!oauthDataExists(__dirname)) {
+      return false;
+    }
+
+    const diskData = loadOAuthData(__dirname);
+    if (!diskData) {
+      return false;
+    }
+
+    const shouldReplace =
+      options.force === true ||
+      !this.oauthData ||
+      this.isOAuthDataNewer(diskData, this.oauthData);
+
+    if (shouldReplace) {
+      this.oauthData = diskData;
+      this.log(
+        options.force ? "Reloaded OAuth token state from disk" : "Synchronized OAuth token state from disk",
+        true,
+        instance
+      );
+      return true;
+    }
+
+    return false;
+  },
+
   /**
    * Refresh OAuth tokens
    * @returns {boolean} True if refresh was successful
    */
   refreshTokens: async function (instance) {
-    if (!this.oauthData || !this.oauthData.refresh_token) {
-      console.error("[MMM-STStatus] ERROR: No refresh token available");
-      if (instance) {
-        this.sendToInstance("ERROR", instance, {
-          message: "OAuth refresh token missing. Please re-run setup.js"
-        });
-      }
-      return false;
+    if (this.oauthRefreshPromise) {
+      this.log("Waiting for in-progress OAuth refresh", true, instance);
+      return await this.oauthRefreshPromise;
     }
 
-    this.log("Refreshing OAuth tokens...");
+    this.oauthRefreshPromise = (async () => {
+      this.syncOAuthDataFromDisk(instance);
 
-    try {
-      const params = new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: this.oauthData.refresh_token,
-        client_id: this.oauthData.clientId
-      });
-
-      // Use Basic Auth header (required by SmartThings)
-      const basicAuth = Buffer.from(
-        this.oauthData.clientId + ":" + this.oauthData.clientSecret
-      ).toString("base64");
-
-      const response = await fetch(this.TOKEN_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Authorization": "Basic " + basicAuth
-        },
-        body: params.toString()
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Token refresh failed (HTTP ${response.status}): ${errorText}`);
-      }
-
-      const newTokens = await response.json();
-
-      // Update OAuth data with new tokens
-      this.oauthData = {
-        ...this.oauthData,
-        access_token: newTokens.access_token,
-        refresh_token: newTokens.refresh_token || this.oauthData.refresh_token,
-        token_type: newTokens.token_type || "Bearer",
-        scope: newTokens.scope || this.oauthData.scope,
-        expiresAt: new Date(Date.now() + (newTokens.expires_in || 86400) * 1000).toISOString(),
-        obtainedAt: new Date().toISOString()
-      };
-
-      // Save updated OAuth data
-      saveOAuthData(__dirname, this.oauthData);
-
-      this.log("OAuth tokens refreshed successfully");
-      if (instance) {
-        instance.authFailed = false;
-      }
-
-      return true;
-
-    } catch (err) {
-      console.error("[MMM-STStatus] ERROR: Token refresh failed:", err.message);
-
-      // Check if it's an invalid_grant error (refresh token revoked)
-      if (err.message.includes("invalid_grant") || err.message.includes("401")) {
+      if (!this.oauthData || !this.oauthData.refresh_token) {
+        console.error("[MMM-STStatus] ERROR: No refresh token available");
         if (instance) {
-          instance.authFailed = true;
           this.sendToInstance("ERROR", instance, {
-            message: "OAuth refresh token invalid. Please re-run setup.js",
-            cached: !!instance.cache,
-            devices: instance.cache ? instance.cache.lastStatus : null,
-            timestamp: instance.cache ? instance.cache.timestamp : null
+            message: "OAuth refresh token missing. Please re-run setup.js"
           });
         }
+        return false;
       }
 
-      return false;
+      if (!tokensNeedRefresh(this.oauthData, 600)) {
+        this.log("OAuth tokens already refreshed by another process", true, instance);
+        if (instance) {
+          instance.authFailed = false;
+        }
+        return true;
+      }
+
+      this.log("Refreshing OAuth tokens...");
+
+      try {
+        const params = new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: this.oauthData.refresh_token,
+          client_id: this.oauthData.clientId
+        });
+
+        // Use Basic Auth header (required by SmartThings)
+        const basicAuth = Buffer.from(
+          this.oauthData.clientId + ":" + this.oauthData.clientSecret
+        ).toString("base64");
+
+        const response = await fetch(this.TOKEN_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": "Basic " + basicAuth
+          },
+          body: params.toString()
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Token refresh failed (HTTP ${response.status}): ${errorText}`);
+        }
+
+        const newTokens = await response.json();
+
+        // Update OAuth data with new tokens
+        this.oauthData = {
+          ...this.oauthData,
+          access_token: newTokens.access_token,
+          refresh_token: newTokens.refresh_token || this.oauthData.refresh_token,
+          token_type: newTokens.token_type || "Bearer",
+          scope: newTokens.scope || this.oauthData.scope,
+          expiresAt: new Date(Date.now() + (newTokens.expires_in || 86400) * 1000).toISOString(),
+          obtainedAt: new Date().toISOString()
+        };
+
+        // Save updated OAuth data
+        saveOAuthData(__dirname, this.oauthData);
+
+        this.log("OAuth tokens refreshed successfully");
+        if (instance) {
+          instance.authFailed = false;
+        }
+
+        return true;
+
+      } catch (err) {
+        console.error("[MMM-STStatus] ERROR: Token refresh failed:", err.message);
+
+        // Another MagicMirror process may have already rotated the refresh token.
+        // Re-read disk state before treating invalid_grant as a hard failure.
+        if ((err.message.includes("invalid_grant") || err.message.includes("401")) &&
+            this.syncOAuthDataFromDisk(instance, { force: true }) &&
+            this.oauthData &&
+            !tokensNeedRefresh(this.oauthData, 600)) {
+          this.log("Recovered from stale in-memory refresh token using disk state", true, instance);
+          if (instance) {
+            instance.authFailed = false;
+          }
+          return true;
+        }
+
+        // Check if it's an invalid_grant error (refresh token revoked)
+        if (err.message.includes("invalid_grant") || err.message.includes("401")) {
+          if (instance) {
+            instance.authFailed = true;
+            this.sendToInstance("ERROR", instance, {
+              message: "OAuth refresh token invalid. Please re-run setup.js",
+              cached: !!instance.cache,
+              devices: instance.cache ? instance.cache.lastStatus : null,
+              timestamp: instance.cache ? instance.cache.timestamp : null
+            });
+          }
+        }
+
+        return false;
+      }
+    })();
+
+    try {
+      return await this.oauthRefreshPromise;
+    } finally {
+      this.oauthRefreshPromise = null;
     }
   },
 
@@ -514,6 +636,8 @@ module.exports = NodeHelper.create({
    * Make an API request with rate limiting and error handling
    */
   apiRequest: async function (endpoint, instance) {
+    this.syncOAuthDataFromDisk(instance);
+
     // Apply backoff if needed
     if (this.backoffDelay > 0) {
       this.log("Applying backoff delay: " + this.backoffDelay + "ms", true, instance);
@@ -545,13 +669,49 @@ module.exports = NodeHelper.create({
 
     // Handle response status
     if (!response.ok) {
-      await this.handleHttpError(response, instance);
+      const recovery = await this.handleHttpError(response, instance);
+      if (recovery === "retry") {
+        this.log("Retrying API request after OAuth refresh: " + endpoint, true, instance);
+        return await this.apiRequestWithRetry(endpoint, instance);
+      }
       return null;
     }
 
     // Reset backoff on success
     this.backoffDelay = 0;
 
+    return await response.json();
+  },
+
+  apiRequestWithRetry: async function (endpoint, instance) {
+    // Retry once with the freshest on-disk token state after a successful refresh.
+    this.syncOAuthDataFromDisk(instance, { force: true });
+
+    const accessToken = this.getAccessToken(instance);
+    if (!accessToken) {
+      throw new Error("No access token available");
+    }
+
+    this.requestCount++;
+    if (this.requestCount >= this.RATE_WARNING) {
+      console.warn("[MMM-STStatus] WARNING: Approaching rate limit (" + this.requestCount + "/" + this.RATE_LIMIT + ")");
+    }
+
+    const url = this.API_BASE + endpoint;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": "Bearer " + accessToken,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (!response.ok) {
+      await this.handleHttpError(response, instance);
+      return null;
+    }
+
+    this.backoffDelay = 0;
     return await response.json();
   },
 
@@ -584,8 +744,7 @@ module.exports = NodeHelper.create({
           console.warn("[MMM-STStatus] Auth error (HTTP " + status + "), attempting token refresh...");
           const refreshed = await this.refreshTokens(instance);
           if (refreshed) {
-            // Don't throw, let the caller retry
-            throw new Error("Token refreshed, retry request");
+            return "retry";
           }
         }
 
