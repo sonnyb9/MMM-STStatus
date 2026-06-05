@@ -324,6 +324,35 @@ module.exports = NodeHelper.create({
     return false;
   },
 
+  tryRecoverAuthFailedInstance: async function (instance, reason = "current OAuth state") {
+    if (!instance || !instance.authFailed || !instance.config) {
+      return false;
+    }
+
+    this.syncOAuthDataFromDisk(instance, { force: true });
+
+    if (!this.oauthData || tokensNeedRefresh(this.oauthData, 600)) {
+      return false;
+    }
+
+    instance.authFailed = false;
+    this.log("Recovered auth-failed instance using " + reason, true, instance);
+    this.sendToInstance("LOADING", instance, {});
+    await this.fetchDevices(instance);
+
+    if (!instance.authFailed && !instance.pollTimer) {
+      this.startPolling(instance);
+    }
+
+    return !instance.authFailed;
+  },
+
+  recoverAuthFailedInstances: async function (reason = "current OAuth state") {
+    for (const instance of Object.values(this.instances)) {
+      await this.tryRecoverAuthFailedInstance(instance, reason);
+    }
+  },
+
   /**
    * Refresh OAuth tokens
    * @returns {boolean} True if refresh was successful
@@ -352,6 +381,7 @@ module.exports = NodeHelper.create({
         if (instance) {
           instance.authFailed = false;
         }
+        await this.recoverAuthFailedInstances("fresh OAuth data on disk");
         return true;
       }
 
@@ -404,6 +434,8 @@ module.exports = NodeHelper.create({
           instance.authFailed = false;
         }
 
+        await this.recoverAuthFailedInstances("successful OAuth refresh");
+
         return true;
 
       } catch (err) {
@@ -419,6 +451,7 @@ module.exports = NodeHelper.create({
           if (instance) {
             instance.authFailed = false;
           }
+          await this.recoverAuthFailedInstances("reloaded OAuth token state from disk");
           return true;
         }
 
@@ -482,7 +515,10 @@ module.exports = NodeHelper.create({
   fetchDevices: async function (instance) {
     // Stop immediately if authentication has failed
     if (instance.authFailed) {
-      return;
+      const recovered = await this.tryRecoverAuthFailedInstance(instance, "fresh OAuth state");
+      if (!recovered) {
+        return;
+      }
     }
 
     // Check if tokens need refresh before making requests
