@@ -126,8 +126,13 @@ Example output from setup wizard:
 ### Step 7: Restart MagicMirror
 
 ```bash
-pm2 restart MagicMirror
+# Restart your MagicMirror process using whatever supervisor you use.
+# Examples:
+pm2 restart mm
+pm2 restart mm-tv
 ```
+
+If you do not use PM2, restart MagicMirror with your usual service, container, or manual launch workflow.
 
 ## Configuration Options
 
@@ -337,7 +342,7 @@ Refresh tokens expire after 30 days of non-use. Re-run `node setup.js` to get ne
 - SmartThings allows 250 requests per minute
 
 #### Module not appearing
-- Check logs: `pm2 logs MagicMirror`
+- Check logs for the MagicMirror process you actually run
 - Verify syntax in config.js (missing commas are common)
 - Ensure `npm install` completed successfully
 
