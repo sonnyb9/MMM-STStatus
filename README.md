@@ -142,6 +142,7 @@ If you do not use PM2, restart MagicMirror with your usual service, container, o
 | `hiddenDevices` | Array | `[]` | Device IDs to fetch and broadcast but omit from the visible table |
 | `rooms` | Array | `[]` | List of room names to include (e.g., `["Living Room"]`) |
 | `pollInterval` | Number | `60000` | How often to fetch updates (ms, minimum 30000) |
+| `registrationCheckInterval` | Number | `30000` | Frontend heartbeat interval used to rebuild polling after a node-helper restart |
 | `broadcastDeviceData` | Boolean | `false` | Re-broadcast normalized device payloads to other frontend modules |
 | `broadcastNotification` | String | `"STSTATUS_DEVICE_DATA"` | Notification name used when `broadcastDeviceData` is enabled |
 | `showLastUpdated` | Boolean | `true` | Show clock time of last successful API update (e.g., "Last Update: 10:30:45 AM") |

@@ -84,6 +84,20 @@ module.exports = NodeHelper.create({
       instance.config = payload;
       this.log("Config received", true, instance);
       this.initialize(instance);
+      return;
+    }
+
+    if (notification === "CHECK_INSTANCE") {
+      const identifier = payload && payload.identifier;
+      if (!identifier) {
+        return;
+      }
+
+      if (!this.instances[identifier] || !this.instances[identifier].config) {
+        this.sendSocketNotification("INSTANCE_REGISTRATION_REQUIRED", {
+          identifier: identifier
+        });
+      }
     }
   },
 

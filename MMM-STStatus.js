@@ -16,6 +16,7 @@ Module.register("MMM-STStatus", {
     hiddenDevices: [],            // Device IDs to hide from display while still fetching/broadcasting
     rooms: [],                    // Room names to include: ["Living Room", "Kitchen"]
     pollInterval: 60000,          // Polling interval in ms (default: 60 seconds)
+    registrationCheckInterval: 30000, // Re-register after a node_helper restart
     broadcastDeviceData: false,   // Broadcast normalized device data for other modules
     broadcastNotification: "STSTATUS_DEVICE_DATA",
     showLastUpdated: true,        // Show last updated timestamp
@@ -91,6 +92,7 @@ Module.register("MMM-STStatus", {
   error: null,
   lastUpdate: null,
   currentAlert: null,  // { type: string, messageKey: string }
+  registrationCheckTimer: null,
 
   /**
    * Called when module starts
@@ -106,6 +108,23 @@ Module.register("MMM-STStatus", {
       return;
     }
 
+    this.registerBackend();
+
+    // Browser socket reconnects do not call start() again. Periodically ask
+    // the helper whether this instance is still registered so a helper/PM2
+    // restart can rebuild its in-memory poll timer without a browser reload.
+    const registrationCheckInterval = Math.max(
+      Number(this.config.registrationCheckInterval) || 30000,
+      10000
+    );
+    this.registrationCheckTimer = setInterval(() => {
+      this.sendSocketNotification("CHECK_INSTANCE", {
+        identifier: this.identifier
+      });
+    }, registrationCheckInterval);
+  },
+
+  registerBackend: function () {
     // Send config to backend with this instance identifier so the helper can
     // keep per-instance state when multiple MagicMirror configs load the module.
     this.sendSocketNotification("SET_CONFIG", {
@@ -162,6 +181,10 @@ Module.register("MMM-STStatus", {
           });
         }
         this.updateDom();
+        break;
+
+      case "INSTANCE_REGISTRATION_REQUIRED":
+        this.registerBackend();
         break;
 
       case "ERROR":

@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Documentation for the `npm run test:smartthings` verification script in `README.md` and `TESTING_GUIDE.md`
   - Covers default behavior, supported flags, OAuth/token refresh expectations, and cache updates
+- Frontend registration heartbeat that automatically restores instance polling
+  after the MagicMirror node helper restarts
 
 ---
 
